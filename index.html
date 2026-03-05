@@ -617,7 +617,9 @@ let state={
   ],
   nextRewardId:8, nextChoreId:6,
   rewardRequests:[],
-  history:{}, // { 'YYYY-MM-DD': { kidId: { choreName: 'signed'|'checked'|'cancelled', ... } } }
+  history:{},
+  messages:[], // [{id, from, fromName, fromEmoji, to, text, time, read:[]}]
+  gameWinScore:{pong:5,snake:10,breakout:0,space:0,dino:20}, // 0 = clear all
   // difficulty per game: easy|medium|hard
   gameDifficulty:{pong:'medium',snake:'medium',breakout:'medium',space:'medium',dino:'medium'},
   // leaderboard: { gameId: [ {name, emoji, score, kidId} ] }  (top 5 per game)
@@ -761,12 +763,24 @@ function enterApp(type,id){
 // ═══ TABS ═══
 function buildTabs(type,id){
   let tabs=[];
-  if(type==='kid') tabs=[{id:'chores',label:'📋 Chores'},{id:'points',label:'⭐ Points'},{id:'rewards',label:'🎁 Rewards'},{id:'arcade',label:'🎮 Arcade'},{id:'leaderboard',label:'🏆 Scores'}];
+  if(type==='kid'){
+    const unread=(state.messages||[]).filter(m=>(m.to===id||m.to==='all')&&!(m.read||[]).includes(id)).length;
+    const msgLabel=unread>0?`💬 <span style="background:#ef4444;color:white;border-radius:10px;padding:1px 6px;font-size:.7rem">${unread}</span>`:'💬';
+    tabs=[
+      {id:'chores',label:'📋 Chores'},
+      {id:'points',label:'⭐ Points'},
+      {id:'rewards',label:'🎁 Rewards'},
+      {id:'arcade',label:'🎮 Arcade'},
+      {id:'leaderboard',label:'🏆 Scores'},
+      {id:'messages',label:msgLabel,raw:true},
+      {id:'profile',label:'👤 Profile'},
+    ];
+  }
   else if(type==='supervisor'){tabs=[{id:'signoff',label:'✅ Sign Off'}];state.kids.forEach(k=>tabs.push({id:`view-${k.id}`,label:`${k.emoji} ${k.name}`}));}
   else{
     const pendingReqs=(state.rewardRequests||[]).filter(r=>r.status==='pending').length;
     const rwLabel=pendingReqs>0?`🎁 Rewards <span style="background:#ef4444;color:white;border-radius:10px;padding:1px 6px;font-size:.7rem">${pendingReqs}</span>`:'🎁 Rewards';
-    tabs=[{id:'overview',label:'📊 Overview'},{id:'rewards',label:rwLabel,raw:true},{id:'history',label:'📅 History'},{id:'leaderboard',label:'🏆 Scores'},{id:'settings',label:'⚙️ Settings'}];
+    tabs=[{id:'overview',label:'📊 Overview'},{id:'rewards',label:rwLabel,raw:true},{id:'history',label:'📅 History'},{id:'messages',label:'💬 Messages'},{id:'leaderboard',label:'🏆 Scores'},{id:'settings',label:'⚙️ Settings'}];
     state.kids.forEach(k=>tabs.push({id:`parent-${k.id}`,label:`${k.emoji} ${k.name}`}));
   }
   activeTab=tabs[0].id;
@@ -787,6 +801,8 @@ function renderTab(type,id){
     else if(activeTab==='rewards') c.innerHTML=renderRewards(false);
     else if(activeTab==='arcade') c.innerHTML=renderArcadeMenu(id);
     else if(activeTab==='leaderboard') c.innerHTML=renderLeaderboard();
+    else if(activeTab==='messages'){c.innerHTML=renderMessages(false,id);markMessagesRead(id);}
+    else if(activeTab==='profile') c.innerHTML=renderKidProfile(id);
   } else if(type==='supervisor'){
     if(activeTab==='signoff') c.innerHTML=renderSignOff();
     else c.innerHTML=renderKidChores(getKid(parseInt(activeTab.split('-')[1])));
@@ -794,6 +810,7 @@ function renderTab(type,id){
     if(activeTab==='overview') c.innerHTML=renderParentOverview();
     else if(activeTab==='rewards') c.innerHTML=renderRewards(true);
     else if(activeTab==='history'){c.innerHTML='<div style="padding:16px"><button class="btn btn-primary" onclick="openHistoryModal()">📅 Open History Browser</button></div>';return;}
+    else if(activeTab==='messages') c.innerHTML=renderMessages(true,id);
     else if(activeTab==='leaderboard') c.innerHTML=renderLeaderboard();
     else if(activeTab==='settings'){renderSettings();return;}
     else c.innerHTML=renderParentKid(parseInt(activeTab.split('-')[1]));
@@ -1067,7 +1084,7 @@ function initPong(){
     cpu:{y:cH()/2-35,h:60,score:0,speed:cpuSpeed},
     keys:{up:false,down:false},
     touch:{up:false,down:false},
-    WIN:5,
+    WIN:state.gameWinScore?.pong??5,
   };
   setScoreBar([{label:'YOU',val:0,color:'#ff3d6e'},{label:'CPU',val:0,color:'#7c3aed'}]);
   setupMobileControls([
@@ -1160,7 +1177,7 @@ function initSnake(){
     body:[{x:Math.floor(cols/2),y:Math.floor(rows/2)}],
     dir:{x:1,y:0},nextDir:{x:1,y:0},
     apple:randomSnakeApple(cols,rows,[{x:Math.floor(cols/2),y:Math.floor(rows/2)}]),
-    score:0,WIN:10,speed,lastMove:0,cols,rows,gs,
+    score:0,WIN:state.gameWinScore?.snake??10,speed,lastMove:0,cols,rows,gs,
   };
   setScoreBar([{label:'Score',val:0,color:'#10b981'},{label:'Best',val:getBest('snake'),color:'#f59e0b'}]);
   setupMobileControls([
@@ -1425,7 +1442,7 @@ function initDino(){
   const speed=diff==='easy'?4:diff==='hard'?7:5.5;
   gameState.dino={
     dino:{x:60,y:0,vy:0,onGround:true,h:36,w:32},
-    obstacles:[],score:0,WIN:20,
+    obstacles:[],score:0,WIN:state.gameWinScore?.dino??20,
     speed,spawnTimer:0,spawnInterval:diff==='easy'?110:diff==='hard'?60:80,
     groundY:0,keys:{jump:false},touch:{jump:false},jumped:false,
   };
@@ -1807,12 +1824,32 @@ function renderSettings(){
   const choreList=state.chores.map(cc=>{
     const em=cc.kids.map(ki=>getKid(ki)?.emoji||'?').join(' ');
     return`<div class="chore-edit-row"><div class="name">${cc.name}<div style="font-size:.7rem;color:var(--muted)">${em} · ${cc.days.length?cc.days.join('·'):'Every day'}</div></div><button class="btn btn-outline btn-sm" onclick="editChoreOpen(${cc.id})">✏️</button><button class="btn btn-red btn-sm" onclick="deleteChore(${cc.id})">🗑️</button></div>`;}).join('');
-  const diffRows=GAME_DEFS.map(g=>`<div class="bedtime-row"><div style="font-size:1.5rem">${g.icon}</div><div style="flex:1"><div style="font-weight:800">${g.name}</div><div style="font-size:.72rem;color:var(--muted)">${g.desc}</div></div><select class="diff-sel" onchange="setDifficulty('${g.id}',this.value)"><option value="easy"${getDiff(g.id)==='easy'?' selected':''}>😊 Easy</option><option value="medium"${getDiff(g.id)==='medium'?' selected':''}>😤 Medium</option><option value="hard"${getDiff(g.id)==='hard'?' selected':''}>💀 Hard</option></select></div>`).join('');
+  const diffRows=GAME_DEFS.map(g=>{
+    const winScore=state.gameWinScore?.[g.id]??g.winScore;
+    const winLabel=winScore===0?'Clear all':winScore;
+    const winInput=g.id!=='breakout'&&g.id!=='space'
+      ?`<input type="number" min="1" max="99" value="${winScore}" onchange="setWinScore('${g.id}',this.value)"
+          style="width:52px;padding:4px 6px;border-radius:8px;border:2px solid var(--border);background:var(--surface2);color:var(--text);font-weight:800;text-align:center;font-size:.82rem">`
+      :`<span style="font-size:.78rem;color:var(--muted);font-weight:700">Clear all</span>`;
+    return`<div class="bedtime-row">
+      <div style="font-size:1.5rem">${g.icon}</div>
+      <div style="flex:1"><div style="font-weight:800">${g.name}</div><div style="font-size:.72rem;color:var(--muted)">Win score: ${winLabel}</div></div>
+      <div style="display:flex;gap:6px;align-items:center">
+        ${winInput}
+        <select class="diff-sel" onchange="setDifficulty('${g.id}',this.value)">
+          <option value="easy"${getDiff(g.id)==='easy'?' selected':''}>😊 Easy</option>
+          <option value="medium"${getDiff(g.id)==='medium'?' selected':''}>😤 Med</option>
+          <option value="hard"${getDiff(g.id)==='hard'?' selected':''}>💀 Hard</option>
+        </select>
+        <button class="btn btn-outline btn-sm" onclick="clearGameScore('${g.id}')" title="Reset ${g.name} scores">🗑️</button>
+      </div>
+    </div>`;
+  }).join('');
   c.innerHTML=`<div class="settings-grid">
     <div class="setting-card"><h3>👦 Kid Profiles</h3>${kidCards}<button class="btn btn-primary btn-sm" style="margin-top:9px" onclick="addKidProfile()">➕ Add Kid</button></div>
     <div class="setting-card"><h3>👁️ Supervisors</h3>${supCards}<button class="btn btn-outline btn-sm" style="margin-top:7px" onclick="addStaffProfile('supervisor')">➕ Supervisor</button><h3 style="margin-top:14px">👑 Parents</h3>${parCards}<button class="btn btn-outline btn-sm" style="margin-top:7px" onclick="addStaffProfile('parent')">➕ Parent</button></div>
     <div class="setting-card"><h3>📋 Chores</h3>${choreList}<button class="btn btn-primary btn-sm" style="margin-top:9px" onclick="addChoreOpen()">➕ Add Chore</button></div>
-    <div class="setting-card" style="grid-column:1/-1"><h3>🎮 Game Difficulty</h3><p style="font-size:.8rem;color:var(--muted);margin-bottom:12px;font-weight:700">Set per-game difficulty.</p>${diffRows}<button class="btn btn-red btn-sm" style="margin-top:12px" onclick="clearLeaderboard()">🗑️ Clear All Scores</button></div>
+    <div class="setting-card" style="grid-column:1/-1"><h3>🎮 Games</h3><p style="font-size:.8rem;color:var(--muted);margin-bottom:12px;font-weight:700">Set difficulty and win score per game. 🗑️ resets that game's high scores only.</p>${diffRows}<button class="btn btn-red btn-sm" style="margin-top:12px" onclick="clearLeaderboard()">🗑️ Clear ALL Scores</button></div>
     <div class="setting-card" style="grid-column:1/-1"><h3>🔥 Sync Status</h3>
       <p style="font-size:.85rem;font-weight:700;margin-bottom:8px">Firebase: ${fbConfigured?'<span style="color:#10b981">✅ Connected — all devices are synced</span>':'<span style="color:#ef4444">❌ Not connected — running on local data only</span>'}</p>
       <p style="font-size:.78rem;color:var(--muted);font-weight:700;margin-bottom:12px">Config is fetched automatically from your Cloudflare Worker.</p>
@@ -1826,9 +1863,177 @@ function renderSettings(){
 }
 
 function setDifficulty(gameId,val){state.gameDifficulty[gameId]=val;saveState();notify(`${GAME_DEFS.find(g=>g.id===gameId).icon} Difficulty set to ${val}!`,'#7c3aed');}
-function clearLeaderboard(){if(confirm('Clear all high scores?')){GAME_DEFS.forEach(g=>state.leaderboard[g.id]=[]);renderTab(session.type,session.id);saveState();notify('🗑️ Scores cleared');}}
+function setWinScore(gameId,val){
+  const n=parseInt(val);if(isNaN(n)||n<1)return;
+  if(!state.gameWinScore)state.gameWinScore={};
+  state.gameWinScore[gameId]=n;
+  // Update the GAME_DEFS live so games use it immediately
+  const gd=GAME_DEFS.find(g=>g.id===gameId);
+  if(gd)gd.winScore=n;
+  saveState();notify(`${gd?.icon||''} Win score set to ${n}!`,'#7c3aed');
+  renderSettings();
+}
+function clearGameScore(gameId){
+  const g=GAME_DEFS.find(x=>x.id===gameId);
+  if(!confirm(`Reset ${g?.name||gameId} high scores?`))return;
+  state.leaderboard[gameId]=[];saveState();renderSettings();
+  notify(`🗑️ ${g?.name||gameId} scores cleared`,'#ef4444');
+}
+function clearLeaderboard(){if(confirm('Clear ALL high scores?')){GAME_DEFS.forEach(g=>state.leaderboard[g.id]=[]);renderTab(session.type,session.id);saveState();notify('🗑️ All scores cleared');}}
 
-// ═══ ACTIONS ═══
+// ═══ MESSAGES / NOTIFICATIONS ═══
+function renderMessages(isParent,userId){
+  const msgs=state.messages||[];
+  const myMsgs=isParent
+    ? msgs.slice().reverse()
+    : msgs.filter(m=>m.to===userId||m.to==='all'||m.from===userId).slice().reverse();
+  const kids=state.kids;
+  const toOptions=isParent
+    ? `<option value="all">📢 All Kids</option>${kids.map(k=>`<option value="${k.id}">${k.emoji} ${k.name}</option>`).join('')}`
+    : `<option value="parent">👑 Parent</option>`;
+  const senderLabel=isParent?'Parent':'Kids';
+  const composeBox=`
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-size:.82rem;font-weight:800;color:var(--muted);margin-bottom:6px">✉️ New Message</div>
+      ${isParent?`<select id="msgTo" class="diff-sel" style="width:100%;margin-bottom:8px">${toOptions}</select>`:`<input type="hidden" id="msgTo" value="parent">`}
+      <textarea id="msgText" placeholder="Type your message..." style="width:100%;min-height:70px;border:2px solid var(--border);border-radius:10px;padding:8px;font-family:'Nunito',sans-serif;font-size:.88rem;background:var(--surface2);color:var(--text);resize:none;margin-bottom:8px"></textarea>
+      <button class="btn btn-primary btn-sm" onclick="sendMessage(${isParent},${isParent?'null':userId})">📤 Send</button>
+    </div>`;
+  const clearBtn=isParent?`<button class="btn btn-red btn-sm" style="margin-bottom:10px" onclick="clearMessages()">🗑️ Clear All Messages</button>`:'';
+  const msgHtml=myMsgs.length?myMsgs.map(m=>{
+    const isOwn=isParent?(m.from==='parent'):(m.from===userId);
+    const fromKid=kids.find(k=>k.id===m.from);
+    const name=m.from==='parent'?'👑 Parent':(fromKid?`${fromKid.emoji} ${fromKid.name}`:'Unknown');
+    const toKid=kids.find(k=>k.id===m.to);
+    const toLabel=m.to==='all'?'📢 All Kids':m.to==='parent'?'👑 Parent':(toKid?`${toKid.emoji} ${toKid.name}`:'?');
+    const unread=!isParent&&!(m.read||[]).includes(userId);
+    return`<div style="display:flex;flex-direction:column;align-items:${isOwn?'flex-end':'flex-start'};margin-bottom:10px">
+      <div style="font-size:.72rem;color:var(--muted);font-weight:700;margin-bottom:3px">${name} → ${toLabel} · ${m.time}</div>
+      <div style="max-width:80%;background:${isOwn?'linear-gradient(135deg,#ff7a00,#f59e0b)':'var(--surface2)'};color:${isOwn?'white':'var(--text)'};
+        border-radius:${isOwn?'16px 16px 4px 16px':'16px 16px 16px 4px'};padding:10px 14px;font-size:.88rem;font-weight:700;
+        box-shadow:0 2px 8px rgba(0,0,0,.08);border:2px solid ${isOwn?'transparent':'var(--border)'};
+        ${unread?'border-color:#f59e0b;':''}">${m.text}</div>
+      ${unread?'<div style="font-size:.65rem;color:#f59e0b;font-weight:800;margin-top:2px">NEW ●</div>':''}
+    </div>`;
+  }).join(''):`<div style="color:var(--muted);text-align:center;padding:30px;font-weight:700">No messages yet 💬</div>`;
+  return`<h2 class="fredoka" style="margin-bottom:12px">💬 Messages</h2>${clearBtn}${composeBox}<div>${msgHtml}</div>`;
+}
+
+function sendMessage(isParent,kidId){
+  const text=(document.getElementById('msgText')?.value||'').trim();
+  if(!text){notify('Type a message first!','#ef4444');return;}
+  const to=isParent?(document.getElementById('msgTo')?.value||'all'):('parent');
+  const from=isParent?'parent':kidId;
+  const fromProfile=isParent
+    ? (state.parents.find(p=>p.id===session.id)||state.parents[0])
+    : getKid(kidId);
+  if(!state.messages)state.messages=[];
+  state.messages.push({
+    id:`msg_${Date.now()}`,from,fromName:fromProfile?.name||'',fromEmoji:fromProfile?.emoji||'',
+    to:isParent?( isNaN(to)?to:parseInt(to) ):to,
+    text,time:new Date().toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}),
+    read:[from]
+  });
+  document.getElementById('msgText').value='';
+  saveState();renderTab(session.type,session.id);
+  notify('💬 Message sent!','#10b981');
+}
+
+function markMessagesRead(kidId){
+  let changed=false;
+  (state.messages||[]).forEach(m=>{
+    if((m.to===kidId||m.to==='all')&&!(m.read||[]).includes(kidId)){
+      if(!m.read)m.read=[];
+      m.read.push(kidId);changed=true;
+    }
+  });
+  if(changed)saveState();
+}
+
+function clearMessages(){
+  if(!confirm('Clear all messages?'))return;
+  state.messages=[];saveState();renderTab(session.type,session.id);notify('🗑️ Messages cleared');
+}
+
+// ═══ KID PROFILE TAB ═══
+function renderKidProfile(kidId){
+  const kid=getKid(kidId);
+  if(!kid)return'';
+  const i=kidId<KC.length?kidId:0;
+  const avatarHtml=kid.photo
+    ?`<img src="${kid.photo}" style="width:90px;height:90px;border-radius:50%;object-fit:cover;border:4px solid ${kid.bgColor||KC[i]}">`
+    :`<div style="width:90px;height:90px;border-radius:50%;border:4px solid ${kid.bgColor||KC[i]};background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:3.2rem">${kid.emoji}</div>`;
+  const colorSwatches=PROFILE_COLORS.map(c=>`
+    <div onclick="kidSetColor(${kidId},'${c}')" style="width:34px;height:34px;border-radius:50%;background:${c};cursor:pointer;
+      border:3px solid ${c===(kid.bgColor||KC[i])?'#2d2013':'transparent'};
+      box-shadow:${c===(kid.bgColor||KC[i])?'0 0 0 2px white inset':'none'};
+      transition:all .15s;flex-shrink:0"></div>`).join('');
+  return`<div style="padding:4px">
+    <div class="card" style="text-align:center;border-color:${KBD[i]};margin-bottom:14px">
+      <div style="display:flex;justify-content:center;margin-bottom:10px;position:relative;display:inline-block">
+        ${avatarHtml}
+        <label style="position:absolute;bottom:0;right:0;background:${kid.bgColor||KC[i]};border-radius:50%;
+          width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.85rem;border:2px solid white">
+          📷<input type="file" accept="image/*" style="display:none" onchange="kidUploadPhoto(${kidId},this)">
+        </label>
+      </div>
+      <div style="font-family:'Fredoka One',cursive;font-size:1.5rem;color:${kid.bgColor||KC[i]};margin-bottom:2px">${kid.name}</div>
+      <div style="font-size:.82rem;color:var(--muted);font-weight:700">${kid.points} ⭐ pts</div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <h3 style="font-family:'Fredoka One',cursive;margin-bottom:10px">😊 Change Icon</h3>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <div style="font-size:2.5rem;width:52px;height:52px;border-radius:50%;border:3px solid ${kid.bgColor||KC[i]};display:flex;align-items:center;justify-content:center;background:var(--surface2)">${kid.emoji}</div>
+        <button class="btn btn-outline" onclick="kidPickEmoji(${kidId})">🎭 Pick Emoji</button>
+        <div style="font-size:.78rem;color:var(--muted);font-weight:700">or upload a 📷 photo above</div>
+      </div>
+    </div>
+    <div class="card">
+      <h3 style="font-family:'Fredoka One',cursive;margin-bottom:10px">🎨 Profile Color</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${colorSwatches}</div>
+    </div>
+  </div>`;
+}
+
+function kidSetColor(kidId,color){
+  getKid(kidId).bgColor=color;saveState();renderTab('kid',session.id);
+  notify('🎨 Color updated!','#7c3aed');
+}
+
+function kidUploadPhoto(kidId,input){
+  const file=input.files[0];if(!file)return;
+  if(file.size>2*1024*1024){notify('Photo too large — max 2MB','#ef4444');return;}
+  const reader=new FileReader();
+  reader.onload=e=>{
+    getKid(kidId).photo=e.target.result;
+    getKid(kidId).emoji=getKid(kidId).emoji||'⭐';
+    saveState();renderTab('kid',session.id);renderHome();
+    notify('📷 Photo updated!','#10b981');
+  };
+  reader.readAsDataURL(file);
+}
+
+let _kidEmojiTarget=null;
+function kidPickEmoji(kidId){
+  _kidEmojiTarget=kidId;
+  // Reuse the emoji picker but with a kid-specific target
+  _emojiTargetId='__kid_emoji__';
+  document.getElementById('emojiSearch').value='';
+  renderEmojiGrid('');
+  openModal('emojiModal');
+}
+
+// Override selectEmoji to handle kid emoji target
+const _origSelectEmoji=selectEmoji;
+function selectEmoji(e){
+  if(_emojiTargetId==='__kid_emoji__'&&_kidEmojiTarget!==null){
+    const kid=getKid(_kidEmojiTarget);
+    if(kid){kid.emoji=e;kid.photo=null;saveState();renderTab('kid',session.id);renderHome();}
+    closeModal('emojiModal');_emojiTargetId=null;_kidEmojiTarget=null;
+    notify('😊 Icon updated!','#10b981');return;
+  }
+  _origSelectEmoji(e);
+}
 function loginKid(id){const k=getKid(id);k.loggedInAt=new Date();k.homeTime=new Date();notify(`${k.emoji} ${k.name} is home! ⏱️`,'#ff7a00');renderTab(session.type,session.id);saveState();}
 function toggleChore(kidId,choreId){const cs=getCS(kidId,choreId);if(cs.cancelled||cs.signed)return;if(!getKid(kidId).loggedInAt)return;setCS(kidId,choreId,{checked:!cs.checked,checkedAt:!cs.checked?new Date():null});renderTab(session.type,session.id);saveState();}
 function toggleTidy(kidId){const k=getKid(kidId);if(k.tidySigned)return;k.tidyChecked=!k.tidyChecked;renderTab(session.type,session.id);saveState();}
@@ -2249,6 +2454,8 @@ function hydrateState(saved){
   if(!saved.gameDifficulty)  saved.gameDifficulty={pong:'medium',snake:'medium',breakout:'medium',space:'medium',dino:'medium'};
   if(!saved.leaderboard)     saved.leaderboard={pong:[],snake:[],breakout:[],space:[],dino:[]};
   if(!saved.history)         saved.history={};
+  if(!saved.messages)        saved.messages=[];
+  if(!saved.gameWinScore)    saved.gameWinScore={pong:5,snake:10,breakout:0,space:0,dino:20};
   // Fix any chores missing days or kids arrays (old data)
   if(saved.chores) saved.chores.forEach(c=>{ if(!c.days) c.days=[]; if(!c.kids) c.kids=[]; });
   // Fix kids missing new fields
