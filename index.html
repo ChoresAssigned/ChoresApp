@@ -402,6 +402,7 @@ select.diff-sel{background:var(--surface2);border:2px solid var(--border);border
     <div class="logo">⭐ Champions</div>
     <div class="user-pill"><span id="userEm">👤</span>&nbsp;<span id="userName">User</span></div>
     <div class="header-right">
+      <div id="fbStatusDot" title="Firebase: not connected" onclick="showFBSetup()" style="width:10px;height:10px;border-radius:50%;background:#ef4444;cursor:pointer;margin-top:2px;box-shadow:0 0 0 3px white,0 0 0 4px #ef4444;flex-shrink:0;align-self:center" title="Firebase status — tap to reconfigure"></div>
       <button class="icon-btn" onclick="openSettings()" title="Settings">⚙️</button>
       <button class="icon-btn" onclick="goHome()" title="Log out">🚪</button>
     </div>
@@ -1675,6 +1676,10 @@ function renderSettings(){
     <div class="setting-card"><h3>👁️ Supervisors</h3>${supCards}<button class="btn btn-outline btn-sm" style="margin-top:7px" onclick="addStaffProfile('supervisor')">➕ Supervisor</button><h3 style="margin-top:14px">👑 Parents</h3>${parCards}<button class="btn btn-outline btn-sm" style="margin-top:7px" onclick="addStaffProfile('parent')">➕ Parent</button></div>
     <div class="setting-card"><h3>📋 Chores</h3>${choreList}<button class="btn btn-primary btn-sm" style="margin-top:9px" onclick="addChoreOpen()">➕ Add Chore</button></div>
     <div class="setting-card" style="grid-column:1/-1"><h3>🎮 Game Difficulty</h3><p style="font-size:.8rem;color:var(--muted);margin-bottom:12px;font-weight:700">Set per-game difficulty.</p>${diffRows}<button class="btn btn-red btn-sm" style="margin-top:12px" onclick="clearLeaderboard()">🗑️ Clear All Scores</button></div>
+    <div class="setting-card" style="grid-column:1/-1"><h3>🔥 Sync Status</h3>
+      <p style="font-size:.85rem;font-weight:700;margin-bottom:8px">Firebase: ${fbConfigured?'<span style="color:#10b981">✅ Connected — all devices are synced</span>':'<span style="color:#ef4444">❌ Not connected — running on local data only</span>'}</p>
+      <p style="font-size:.78rem;color:var(--muted);font-weight:700">Config is fetched automatically from your Cloudflare Worker. No action needed.</p>
+    </div>
   </div>`;
 }
 
@@ -1875,58 +1880,162 @@ function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 document.querySelectorAll('.modal-overlay').forEach(m=>{m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');});});
 
-// ═══ LOCALSTORAGE PERSISTENCE ═══
-const SAVE_KEY='choreChampions_v5';
-function saveState(){
-  try{
-    // Only save serializable data — strip Date objects, convert to timestamps
-    const s=JSON.parse(JSON.stringify(state,(_k,v)=>v instanceof Date?v.toISOString():v));
-    localStorage.setItem(SAVE_KEY,JSON.stringify(s));
-  }catch(e){console.warn('Save failed',e);}
-}
-function loadState(){
-  try{
-    const raw=localStorage.getItem(SAVE_KEY);
-    if(!raw)return;
-    const saved=JSON.parse(raw);
-    // Restore Date fields
-    const dateFields=['loggedInAt','approvedAt','homeTime'];
-    if(saved.kids){
-      saved.kids.forEach(k=>{
-        dateFields.forEach(f=>{if(k[f])k[f]=new Date(k[f]);});
-        // Ensure new fields exist
-        if(!k.pointLog)k.pointLog=[];
-        if(k.tidyChecked===undefined)k.tidyChecked=false;
-        if(k.tidySigned===undefined)k.tidySigned=false;
-      });
-    }
-    // Merge saved into state (keep structure, update values)
-    Object.assign(state,saved);
-    // Re-hydrate any choreState date fields
-    if(state.choreState){
-      Object.values(state.choreState).forEach(cs=>{
-        if(cs.checkedAt)cs.checkedAt=new Date(cs.checkedAt);
-      });
-    }
-    if(!state.rewardRequests)state.rewardRequests=[];
-    if(!state.gameDifficulty)state.gameDifficulty={pong:'medium',snake:'medium',breakout:'medium',space:'medium',dino:'medium'};
-    if(!state.leaderboard)state.leaderboard={pong:[],snake:[],breakout:[],space:[],dino:[]};
-  }catch(e){console.warn('Load failed',e);}
+// ═══════════════════════════════════════════════════════
+// FIREBASE SYNC — config fetched from Cloudflare Worker
+// ═══════════════════════════════════════════════════════
+
+// ▼▼▼ ONLY LINE YOU EVER EDIT ▼▼▼
+const WORKER_URL = 'PASTE_YOUR_WORKER_URL_HERE';
+// ▲▲▲ e.g. 'https://chore-config.yourname.workers.dev'
+
+let db = null;
+let fbConfigured = false;
+let _syncTimeout = null;
+let _unsubscribe = null;
+
+// ── Serialise state (Dates → ISO strings) ──
+function serialiseState(){
+  return JSON.parse(JSON.stringify(state, (_k,v) => v instanceof Date ? v.toISOString() : v));
 }
 
-// Auto-save whenever state changes — wrap key mutating functions
-const _origAddPoints=addPoints;
-function addPoints(kidId,amount,reason){_origAddPoints(kidId,amount,reason);saveState();}
-const _origSetCS=setCS;
-// Patch all state mutations to auto-save
-function patchSave(){
-  // We'll use a lightweight proxy approach via periodic save + event-driven saves
-  // Save on any tab switch, modal close, and key actions
+// ── Re-hydrate dates after reading from Firebase ──
+function hydrateState(saved){
+  const dateFields=['loggedInAt','approvedAt','homeTime'];
+  if(saved.kids){
+    saved.kids.forEach(k=>{
+      dateFields.forEach(f=>{ if(k[f]) k[f]=new Date(k[f]); });
+      if(!k.pointLog) k.pointLog=[];
+      if(k.tidyChecked===undefined) k.tidyChecked=false;
+      if(k.tidySigned===undefined)  k.tidySigned=false;
+    });
+  }
+  if(saved.choreState){
+    Object.values(saved.choreState).forEach(cs=>{
+      if(cs.checkedAt) cs.checkedAt=new Date(cs.checkedAt);
+    });
+  }
+  if(!saved.rewardRequests)  saved.rewardRequests=[];
+  if(!saved.gameDifficulty)  saved.gameDifficulty={pong:'medium',snake:'medium',breakout:'medium',space:'medium',dino:'medium'};
+  if(!saved.leaderboard)     saved.leaderboard={pong:[],snake:[],breakout:[],space:[],dino:[]};
+  return saved;
 }
-// Save on visibility change (phone locks / switches apps)
-document.addEventListener('visibilitychange',()=>{if(document.hidden)saveState();});
-// Save every 30 seconds as a backstop
-setInterval(saveState, 30000);
+
+// ── Push state to Firebase (debounced 800ms) ──
+function saveState(){
+  if(!db){ saveLocalFallback(); return; }
+  clearTimeout(_syncTimeout);
+  _syncTimeout = setTimeout(async ()=>{
+    try{
+      const {ref, set} = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js');
+      await set(ref(db,'appState'), serialiseState());
+    }catch(e){ console.warn('Firebase save failed',e); saveLocalFallback(); }
+  }, 800);
+}
+
+// ── Local fallback (offline / before Worker responds) ──
+const SAVE_KEY = 'choreChampions_local';
+function saveLocalFallback(){
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(serialiseState())); }catch(e){}
+}
+function loadLocalFallback(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(!raw) return false;
+    Object.assign(state, hydrateState(JSON.parse(raw)));
+    return true;
+  }catch(e){ return false; }
+}
+
+// ── Real-time listener ──
+async function startLiveSync(){
+  try{
+    const {ref, onValue} = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js');
+    if(_unsubscribe) _unsubscribe();
+    _unsubscribe = onValue(ref(db,'appState'), snap=>{
+      const data = snap.val();
+      if(!data) return;
+      Object.assign(state, hydrateState(data));
+      if(session.type) renderTab(session.type, session.id);
+      renderHome();
+      if(session.type){
+        let p = session.type==='kid' ? getKid(session.id)
+              : session.type==='supervisor' ? state.supervisors.find(s=>s.id===session.id)
+              : state.parents.find(x=>x.id===session.id);
+        if(p){
+          const em=document.getElementById('userEm');
+          const un=document.getElementById('userName');
+          if(em) em.textContent=p.emoji;
+          if(un) un.textContent=p.name;
+        }
+      }
+    });
+    fbConfigured=true;
+    const dot=document.getElementById('fbStatusDot');
+    if(dot){ dot.style.background='#10b981'; dot.style.boxShadow='0 0 0 3px white,0 0 0 4px #10b981'; dot.title='🔥 Firebase synced'; }
+    console.log('🔥 Firebase live sync active');
+  }catch(e){
+    console.warn('Live sync failed',e);
+    setDotState('error');
+  }
+}
+
+// ── Init Firebase with a config object ──
+async function initFirebase(cfg){
+  try{
+    const {initializeApp, getApps} = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
+    const {getDatabase} = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js');
+    const apps = getApps();
+    const app = apps.length ? apps[0] : initializeApp(cfg);
+    db = getDatabase(app);
+    await startLiveSync();
+  }catch(e){
+    console.error('Firebase init error',e);
+    setDotState('error');
+    loadLocalFallback();
+  }
+}
+
+// ── Fetch config from Cloudflare Worker, then init ──
+async function tryAutoConnect(){
+  setDotState('connecting');
+  loadLocalFallback(); // show local data immediately while fetching
+
+  if(!WORKER_URL || WORKER_URL === 'PASTE_YOUR_WORKER_URL_HERE'){
+    console.warn('Worker URL not set — running local-only');
+    setDotState('error');
+    return;
+  }
+
+  try{
+    const res  = await fetch(WORKER_URL, { cache: 'no-store' });
+    if(!res.ok) throw new Error(`Worker returned ${res.status}`);
+    const cfg  = await res.json();
+    if(!cfg.apiKey || !cfg.databaseURL) throw new Error('Config missing required fields');
+    await initFirebase(cfg);
+  }catch(e){
+    console.warn('Could not fetch config from Worker:', e.message);
+    setDotState('error');
+    // Still usable offline with local data
+  }
+}
+
+function setDotState(s){
+  const dot = document.getElementById('fbStatusDot');
+  if(!dot) return;
+  const states = {
+    connecting: { bg:'#f59e0b', shadow:'#f59e0b', title:'🔄 Connecting to Firebase...' },
+    ok:         { bg:'#10b981', shadow:'#10b981', title:'🔥 Firebase synced ✅' },
+    error:      { bg:'#ef4444', shadow:'#ef4444', title:'❌ Firebase offline — running locally' },
+  };
+  const st = states[s] || states.error;
+  dot.style.background = st.bg;
+  dot.style.boxShadow  = `0 0 0 3px white, 0 0 0 4px ${st.shadow}`;
+  dot.title = st.title;
+}
+
+// Save on app hide / periodic local backup
+document.addEventListener('visibilitychange',()=>{ if(document.hidden){ saveState(); saveLocalFallback(); } });
+setInterval(saveLocalFallback, 30000);
 
 // ═══ INSTALL PROMPT ═══
 let deferredPrompt=null;
@@ -1980,9 +2089,9 @@ function showIOSHint(){
 }
 
 // ═══ INIT ═══
-loadState();  // Load saved data first
 renderHome();
 showIOSHint();
+tryAutoConnect();  // Connect to Firebase (or show setup screen)
 setInterval(()=>{if(session.type==='kid'&&activeTab==='chores')renderTab('kid',session.id);},60000);
 
 // Register Service Worker
