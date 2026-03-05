@@ -1,0 +1,1998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>⭐ Chore Champions</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#fff9f0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Chore Champions">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="application-name" content="Chore Champions">
+<meta name="description" content="Family chore tracker with points, rewards, and arcade games!">
+
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#fff9f0;--surface:#ffffff;--surface2:#fff3e0;--surface3:#ffe8cc;
+  --border:#ffd49a;--text:#2d2013;--muted:#a07840;
+  --c0:#ff3d6e;--c0b:rgba(255,61,110,.10);
+  --c1:#00b896;--c1b:rgba(0,184,150,.10);
+  --c2:#ff7a00;--c2b:rgba(255,122,0,.10);
+  --c3:#7c3aed;--c3b:rgba(124,58,237,.10);
+  --gold:#f59e0b;--green:#10b981;--red:#ef4444;--sky:#0ea5e9;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);
+  background-image:
+    radial-gradient(ellipse 70% 40% at 5% 0%,rgba(255,122,0,.12) 0%,transparent 60%),
+    radial-gradient(ellipse 60% 50% at 95% 5%,rgba(255,61,110,.10) 0%,transparent 60%),
+    radial-gradient(ellipse 50% 60% at 80% 100%,rgba(124,58,237,.08) 0%,transparent 60%),
+    radial-gradient(ellipse 40% 40% at 20% 90%,rgba(0,184,150,.08) 0%,transparent 60%);}
+h1,h2,h3,.fredoka{font-family:'Fredoka One',cursive}
+#app{height:100vh;display:flex;flex-direction:column}
+.screen{display:none;flex:1;overflow-y:auto;overflow-x:hidden}
+.screen.visible{display:flex;flex-direction:column}
+body::before{content:'';position:fixed;top:0;left:0;right:0;height:6px;
+  background:linear-gradient(90deg,#ff3d6e,#ff7a00,#f59e0b,#10b981,#0ea5e9,#7c3aed,#ff3d6e);
+  background-size:200% 100%;animation:rainbow 4s linear infinite;z-index:1000;}
+@keyframes rainbow{0%{background-position:0%}100%{background-position:200%}}
+
+/* HOME */
+#homeScreen{align-items:center;justify-content:flex-start;padding:36px 20px 30px;min-height:100vh}
+.home-title h1{font-size:clamp(2rem,7vw,4rem);
+  background:linear-gradient(135deg,#ff3d6e 0%,#ff7a00 30%,#f59e0b 55%,#7c3aed 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1.1;text-align:center;}
+.home-title .sub{color:var(--muted);font-size:.9rem;text-align:center;margin-top:5px}
+.stars-row{display:flex;gap:8px;justify-content:center;font-size:1.4rem;margin:12px 0 28px;animation:boing 2s ease-in-out infinite}
+@keyframes boing{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-8px) rotate(3deg)}}
+.profile-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;width:100%;max-width:480px;margin-bottom:18px}
+.profile-card{background:var(--surface);border:3px solid var(--border);border-radius:22px;padding:22px 12px;
+  text-align:center;cursor:pointer;transition:all .18s;position:relative;overflow:hidden;
+  box-shadow:0 4px 14px rgba(0,0,0,.06);}
+.profile-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:5px;background:var(--clr);opacity:.7}
+.profile-card:hover{transform:translateY(-4px) scale(1.03);border-color:var(--clr);box-shadow:0 10px 28px rgba(0,0,0,.12)}
+.profile-card:active{transform:scale(.96)}
+.profile-emoji{font-size:3rem;margin-bottom:7px;display:block}
+.profile-name{font-family:'Fredoka One',cursive;font-size:1.3rem}
+.profile-pts{font-size:.8rem;color:var(--muted);margin-top:3px;font-weight:700}
+.profile-dot{width:11px;height:11px;border-radius:50%;background:var(--clr);position:absolute;top:12px;right:12px;
+  box-shadow:0 0 0 3px white,0 0 0 5px var(--clr)}
+.staff-row{display:flex;gap:12px;width:100%;max-width:480px}
+.staff-btn{flex:1;padding:13px 8px;border-radius:16px;border:3px solid var(--border);background:var(--surface);
+  color:var(--text);cursor:pointer;font-family:'Fredoka One',cursive;font-size:.95rem;
+  transition:all .18s;display:flex;flex-direction:column;align-items:center;gap:4px;
+  box-shadow:0 3px 10px rgba(0,0,0,.06);}
+.staff-btn:hover{transform:translateY(-3px);border-color:var(--clr,#f59e0b)}
+.staff-btn span{font-size:1.6rem}
+
+/* PIN */
+#pinScreen{align-items:center;justify-content:center;padding:20px}
+.pin-wrap{background:var(--surface);border:3px solid var(--border);border-radius:26px;
+  padding:32px 24px;width:100%;max-width:320px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.1);}
+.pin-avatar{font-size:4rem;margin-bottom:8px}
+.pin-title{font-size:1.6rem;margin-bottom:3px}
+.pin-sub{color:var(--muted);font-size:.85rem;margin-bottom:20px}
+.pin-dots{display:flex;gap:12px;justify-content:center;margin-bottom:20px}
+.pin-dot{width:18px;height:18px;border-radius:50%;border:3px solid var(--border);background:transparent;transition:.15s}
+.pin-dot.filled{background:var(--fill,#f59e0b);border-color:var(--fill,#f59e0b);box-shadow:0 0 12px var(--fill,#f59e0b)}
+.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.pin-key{padding:14px;border-radius:12px;border:2px solid var(--border);background:var(--surface2);color:var(--text);
+  font-size:1.4rem;font-weight:900;cursor:pointer;font-family:'Fredoka One',cursive;transition:all .1s;
+  box-shadow:0 3px 0 var(--border);}
+.pin-key:hover{background:var(--surface3)}
+.pin-key:active{transform:translateY(2px);box-shadow:none}
+.pin-err{color:var(--red);font-size:.85rem;margin-top:10px;font-weight:800;display:none;animation:shake .3s ease}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.pin-hint{margin-top:10px;font-size:.74rem;color:var(--muted)}
+
+/* MAIN APP */
+#mainApp{flex-direction:column}
+.app-header{display:flex;align-items:center;gap:10px;padding:12px 16px;
+  background:rgba(255,249,240,.96);backdrop-filter:blur(12px);
+  border-bottom:3px solid var(--border);position:sticky;top:0;z-index:50;flex-shrink:0;}
+.app-header .logo{font-family:'Fredoka One',cursive;font-size:1.2rem;
+  background:linear-gradient(90deg,#ff3d6e,#ff7a00);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.user-pill{display:flex;align-items:center;gap:7px;background:var(--surface2);border:2px solid var(--border);
+  border-radius:30px;padding:5px 12px 5px 7px;font-size:.85rem;font-weight:800;}
+.header-right{margin-left:auto;display:flex;gap:7px}
+.icon-btn{width:34px;height:34px;border-radius:10px;border:2px solid var(--border);background:var(--surface2);
+  color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.95rem;
+  transition:all .15s;box-shadow:0 2px 0 var(--border);}
+.icon-btn:hover{background:var(--surface3)}
+.icon-btn:active{transform:translateY(1px);box-shadow:none}
+.tab-bar{display:flex;gap:3px;padding:8px 14px 0;overflow-x:auto;scrollbar-width:none;flex-shrink:0}
+.tab-bar::-webkit-scrollbar{display:none}
+.tab-btn{padding:7px 15px;border-radius:12px 12px 0 0;border:2px solid var(--border);border-bottom:none;
+  background:var(--surface2);color:var(--muted);cursor:pointer;font-family:'Fredoka One',cursive;
+  font-size:.88rem;white-space:nowrap;transition:all .15s;}
+.tab-btn:hover{color:var(--text);background:var(--surface3)}
+.tab-btn.active{background:var(--surface);color:var(--text);border-bottom:2px solid var(--surface)}
+.tab-content{flex:1;background:var(--surface);border-top:2px solid var(--border);padding:18px;overflow-y:auto}
+
+/* BUTTONS */
+.btn{padding:9px 18px;border-radius:13px;border:none;cursor:pointer;
+  font-family:'Nunito',sans-serif;font-weight:800;font-size:.88rem;
+  transition:all .12s;display:inline-flex;align-items:center;gap:5px;
+  box-shadow:0 3px 0 rgba(0,0,0,.12);}
+.btn:active{transform:translateY(2px);box-shadow:none}
+.btn-primary{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:white}
+.btn-green{background:linear-gradient(135deg,#10b981,#059669);color:white}
+.btn-gold{background:linear-gradient(135deg,#f59e0b,#d97706);color:white}
+.btn-red{background:linear-gradient(135deg,#ef4444,#dc2626);color:white}
+.btn-sky{background:linear-gradient(135deg,#0ea5e9,#0284c7);color:white}
+.btn-orange{background:linear-gradient(135deg,#ff7a00,#e06000);color:white}
+.btn-outline{background:var(--surface2);border:2px solid var(--border);color:var(--muted);box-shadow:none}
+.btn-outline:hover{border-color:var(--muted);color:var(--text)}
+.btn-sm{padding:5px 12px;font-size:.78rem;border-radius:9px;box-shadow:0 2px 0 rgba(0,0,0,.1)}
+
+/* CARDS */
+.card{background:var(--surface);border:2px solid var(--border);border-radius:16px;padding:14px;
+  box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.card+.card{margin-top:10px}
+.badge{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:20px;font-size:.7rem;font-weight:800}
+.badge-pending{background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb}
+.badge-done{background:#fef3c7;color:#d97706;border:1px solid #fde68a}
+.badge-signed{background:#d1fae5;color:#059669;border:1px solid #a7f3d0}
+.badge-cancelled{background:#fee2e2;color:#dc2626;border:1px solid #fecaca}
+.section-head{font-family:'Fredoka One',cursive;font-size:1.05rem;color:var(--muted);margin:18px 0 10px;
+  display:flex;align-items:center;gap:7px}
+.section-head::after{content:'';flex:1;height:2px;background:var(--border)}
+
+/* CHORES */
+.chore-row{display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:13px;
+  background:var(--surface2);border:2px solid var(--border);margin-bottom:7px;transition:all .15s;}
+.chore-row.is-signed{border-color:#a7f3d0;background:#f0fdf4}
+.chore-row.is-done{border-color:#fde68a;background:#fffbeb}
+.chore-row.is-cancelled{opacity:.45}
+.chore-check-box{width:26px;height:26px;border-radius:8px;border:2.5px solid var(--border);background:var(--surface);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.95rem;flex-shrink:0;
+  transition:all .12s;box-shadow:0 2px 0 var(--border);}
+.chore-check-box:active{transform:scale(.88)}
+.chore-check-box.checked{background:#f59e0b;border-color:#d97706;color:white;box-shadow:0 2px 0 #d97706}
+.chore-check-box.signed{background:#10b981;border-color:#059669;color:white;box-shadow:0 2px 0 #059669}
+.chore-info{flex:1;min-width:0}
+.chore-name{font-weight:800;font-size:.9rem;color:var(--text)}
+.chore-meta{font-size:.73rem;color:var(--muted);margin-top:2px}
+.chore-day-tag{font-size:.66rem;font-weight:800;padding:2px 7px;border-radius:9px;background:#ede9fe;color:#7c3aed;border:1px solid #c4b5fd}
+
+/* KID HERO */
+.kid-hero{border-radius:20px;padding:18px;margin-bottom:14px;position:relative;overflow:hidden}
+.kid-hero-dots{position:absolute;inset:0;opacity:.35;background-image:radial-gradient(circle,rgba(0,0,0,.07) 1px,transparent 1px);background-size:20px 20px}
+.kid-hero-inner{position:relative;z-index:1;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.kid-big-emoji{font-size:3.5rem}
+.kid-stat-row{display:flex;gap:7px;margin-top:9px;flex-wrap:wrap}
+.stat-chip{background:rgba(255,255,255,.75);border:2px solid rgba(255,255,255,.9);border-radius:9px;padding:4px 10px;
+  font-size:.8rem;font-weight:800;color:var(--text);}
+.progress-wrap{margin:10px 0}
+.progress-label{display:flex;justify-content:space-between;font-size:.8rem;font-weight:700;color:var(--muted);margin-bottom:4px}
+.progress-track{height:11px;background:var(--surface2);border-radius:10px;overflow:hidden;border:2px solid var(--border)}
+.progress-fill{height:100%;border-radius:10px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+.free-time-banner{border-radius:16px;padding:14px 18px;display:flex;align-items:center;gap:11px;margin-bottom:14px;font-weight:800}
+.free-time-banner.approved{background:linear-gradient(135deg,#d1fae5,#a7f3d0);border:2px solid #6ee7b7;color:#065f46}
+.free-time-banner.waiting{background:linear-gradient(135deg,#fffbeb,#fef3c7);border:2px solid #fde68a;color:#92400e}
+.timer-chip{padding:4px 12px;border-radius:18px;font-size:.78rem;font-weight:800}
+.timer-2pt{background:#d1fae5;color:#065f46;border:1px solid #6ee7b7}
+.timer-1pt{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
+.timer-out{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
+.pts-log{max-height:150px;overflow-y:auto}
+.pts-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:.8rem}
+.pts-row:last-child{border:none}
+.pts-pos{color:#059669;font-weight:800}
+.pts-neg{color:#dc2626;font-weight:800}
+
+/* REWARDS */
+.rewards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.reward-card{background:var(--surface);border:3px solid var(--border);border-radius:18px;padding:16px;
+  transition:all .18s;position:relative;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,.05);}
+.reward-card::before{content:'';position:absolute;top:0;left:0;right:0;height:5px;
+  background:linear-gradient(90deg,#ff3d6e,#ff7a00,#f59e0b,#10b981,#7c3aed)}
+.reward-card:hover{transform:translateY(-3px);border-color:#fbbf24}
+.rw-icon{font-size:2.6rem;margin-bottom:7px}
+.rw-name{font-family:'Fredoka One',cursive;font-size:1.05rem}
+.rw-cost{color:#d97706;font-weight:900;font-size:1.2rem;margin:4px 0}
+.rw-desc{font-size:.78rem;color:var(--muted);margin-bottom:10px}
+.rw-kids{display:flex;gap:5px;flex-wrap:wrap}
+.rw-kid-btn{padding:4px 10px;border-radius:8px;border:2px solid transparent;cursor:pointer;
+  font-size:.73rem;font-weight:800;font-family:'Nunito',sans-serif;transition:all .12s;
+  box-shadow:0 2px 0 rgba(0,0,0,.1);}
+.rw-kid-btn:active{transform:translateY(1px);box-shadow:none}
+
+/* SUPERVISOR / PARENT */
+.super-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.super-card{background:var(--surface);border:2px solid var(--border);border-radius:18px;padding:14px;
+  box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.super-card-head{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+.mini-em{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0}
+.sign-row{display:flex;align-items:center;gap:7px;padding:6px 0;border-bottom:1px solid var(--border);font-size:.83rem;font-weight:600}
+.sign-row:last-child{border:none}
+
+/* SETTINGS */
+.settings-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.setting-card{background:var(--surface);border:2px solid var(--border);border-radius:18px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.setting-card h3{font-family:'Fredoka One',cursive;font-size:1.05rem;margin-bottom:12px;display:flex;align-items:center;gap:7px}
+.form-row{display:flex;gap:7px;margin-bottom:7px;flex-wrap:wrap}
+.form-row input,.form-row select,input.f-inp,select.f-inp{
+  background:var(--surface2);border:2px solid var(--border);border-radius:9px;color:var(--text);
+  padding:7px 10px;font-family:'Nunito',sans-serif;font-size:.86rem;flex:1;min-width:0;}
+input.f-inp:focus,select.f-inp:focus,.form-row input:focus,.form-row select:focus{outline:none;border-color:#f59e0b}
+.profile-list-item{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:11px;
+  background:var(--surface2);border:2px solid var(--border);margin-bottom:5px}
+.profile-list-item .em{font-size:1.3rem}
+.profile-list-item .info{flex:1}
+.profile-list-item .name{font-weight:800;font-size:.9rem}
+.profile-list-item .sub{font-size:.73rem;color:var(--muted)}
+.chore-edit-row{display:flex;align-items:center;gap:7px;padding:6px 9px;border-radius:9px;
+  background:var(--surface2);border:2px solid var(--border);margin-bottom:5px}
+.chore-edit-row .name{flex:1;font-size:.86rem;font-weight:700}
+.day-tags-wrap{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.day-tag{padding:3px 9px;border-radius:9px;font-size:.7rem;font-weight:800;border:2px solid var(--border);
+  background:var(--surface2);color:var(--muted);cursor:pointer;transition:all .12s}
+.day-tag.on{background:#ede9fe;color:#7c3aed;border-color:#c4b5fd}
+input[type="time"]{background:var(--surface2);border:2px solid var(--border);border-radius:9px;color:var(--text);
+  padding:5px 9px;font-family:'Nunito',sans-serif;font-size:.88rem}
+.bedtime-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;
+  background:var(--surface2);border:2px solid var(--border);margin-bottom:7px}
+select.diff-sel{background:var(--surface2);border:2px solid var(--border);border-radius:9px;
+  color:var(--text);padding:5px 9px;font-family:'Nunito',sans-serif;font-size:.86rem;font-weight:700}
+
+/* EMOJI PICKER */
+.emoji-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;max-height:220px;overflow-y:auto;margin:10px 0}
+.ep-btn{font-size:1.4rem;padding:6px;border-radius:8px;border:2px solid transparent;background:var(--surface2);
+  cursor:pointer;transition:all .1s;text-align:center;line-height:1}
+.ep-btn:hover{border-color:var(--gold);transform:scale(1.15)}
+.ep-btn.selected{border-color:var(--gold);background:#fef3c7}
+.ep-input{width:100%;background:var(--surface2);border:2px solid var(--border);border-radius:9px;
+  color:var(--text);padding:7px 10px;font-size:1.1rem;font-family:'Nunito',sans-serif;margin-bottom:8px}
+.ep-input:focus{outline:none;border-color:#f59e0b}
+.ep-section{font-size:.72rem;font-weight:800;color:var(--muted);margin:8px 0 4px;text-transform:uppercase;letter-spacing:.5px}
+
+/* REWARD REQUEST */
+.req-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;
+  font-size:.7rem;font-weight:800;background:#ede9fe;color:#7c3aed;border:1px solid #c4b5fd}
+.req-pending{background:#fef3c7;color:#d97706;border-color:#fde68a}
+.req-approved{background:#d1fae5;color:#059669;border-color:#a7f3d0}
+.req-list-item{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:12px;
+  background:var(--surface2);border:2px solid var(--border);margin-bottom:6px}
+
+/* PROFILE AVATAR EDIT */
+.avatar-edit-wrap{position:relative;display:inline-block;cursor:pointer}
+.avatar-edit-wrap .avatar-overlay{position:absolute;inset:0;border-radius:50%;
+  background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:.18s;font-size:.9rem;color:white;font-weight:800}
+.avatar-edit-wrap:hover .avatar-overlay{opacity:1}
+.parent-profile-card{background:var(--surface2);border:2px solid var(--border);border-radius:16px;
+  padding:16px;display:flex;align-items:center;gap:14px;margin-bottom:10px}
+.parent-avatar-circle{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:2rem;border:3px solid var(--border);background:var(--surface);
+  flex-shrink:0;cursor:pointer;transition:all .18s;position:relative;overflow:hidden}
+.parent-avatar-circle:hover{border-color:#f59e0b;transform:scale(1.05)}
+
+/* MODALS */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:200;
+  align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(4px)}
+.modal-overlay.open{display:flex}
+.modal-box{background:var(--surface);border:3px solid var(--border);border-radius:22px;padding:24px;
+  width:100%;max-width:420px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.15)}
+.modal-box h3{font-family:'Fredoka One',cursive;font-size:1.3rem;margin-bottom:14px}
+
+/* NOTIFICATION */
+#notif{position:fixed;bottom:18px;right:16px;background:var(--surface);border:3px solid var(--border);
+  border-radius:14px;padding:10px 16px;font-size:.86rem;font-weight:800;max-width:270px;
+  z-index:999;display:none;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.12);
+  animation:slideup .3s ease}
+@keyframes slideup{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+.confetti-wrap{position:fixed;inset:0;pointer-events:none;z-index:998;overflow:hidden;display:none}
+.confetti-piece{position:absolute;animation:cffall linear forwards}
+@keyframes cffall{0%{transform:translateY(-20px) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}
+
+/* ═══════════════ ARCADE ═══════════════ */
+#arcadeScreen{align-items:stretch;flex-direction:column;padding:0}
+.arcade-wrap{display:flex;flex-direction:column;align-items:center;padding:16px;flex:1;overflow-y:auto}
+.arcade-header{display:flex;align-items:center;gap:12px;margin-bottom:14px;width:100%;max-width:560px;flex-wrap:wrap}
+.arcade-header h2{font-family:'Fredoka One',cursive;font-size:1.6rem;
+  background:linear-gradient(135deg,#ff3d6e,#ff7a00);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.arcade-pts-badge{background:#fef3c7;border:2px solid #fde68a;border-radius:11px;padding:5px 13px;font-size:.83rem;font-weight:800;color:#92400e;margin-left:auto}
+
+/* Game canvas wrapper */
+.game-canvas-wrap{position:relative;width:100%;max-width:560px}
+#gameCanvas{border-radius:14px;border:3px solid var(--border);box-shadow:0 6px 24px rgba(0,0,0,.12);
+  display:block;width:100%;touch-action:none;background:#1a2744}
+
+/* Score bar */
+.game-score-bar{display:flex;gap:16px;justify-content:center;margin-bottom:10px;width:100%;max-width:560px;flex-wrap:wrap}
+.gsb-box{background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:8px 20px;
+  text-align:center;box-shadow:0 3px 10px rgba(0,0,0,.06);min-width:90px}
+.gsb-label{font-size:.75rem;font-weight:800;color:var(--muted)}
+.gsb-val{font-family:'Fredoka One',cursive;font-size:2rem;line-height:1.1}
+
+/* Game overlay */
+.game-overlay{position:absolute;inset:0;border-radius:12px;
+  background:rgba(26,39,68,.88);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;color:white;text-align:center;
+  transition:opacity .3s;padding:20px}
+.game-overlay.hidden{opacity:0;pointer-events:none}
+.go-icon{font-size:3rem;margin-bottom:8px}
+.go-title{font-family:'Fredoka One',cursive;font-size:1.8rem;margin-bottom:6px}
+.go-msg{font-size:.9rem;opacity:.85;margin-bottom:18px;max-width:260px}
+
+/* Mobile controls */
+.mobile-controls{display:none;gap:8px;margin-top:10px;width:100%;max-width:560px}
+.mc-btn{flex:1;padding:20px 10px;border:3px solid var(--border);border-radius:14px;
+  background:var(--surface2);color:var(--text);font-size:1.5rem;font-weight:900;
+  cursor:pointer;box-shadow:0 3px 0 var(--border);font-family:'Fredoka One',cursive;
+  user-select:none;-webkit-user-select:none;transition:all .08s;touch-action:manipulation}
+.mc-btn:active{transform:translateY(2px);box-shadow:none;background:var(--surface3)}
+.mc-row-2{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%;max-width:560px;margin-top:8px}
+@media(max-width:600px){.mobile-controls{display:flex}.mc-row-2{display:grid}}
+.desktop-hint{font-size:.78rem;color:var(--muted);text-align:center;margin-top:8px;font-weight:700;background:var(--surface2);
+  border-radius:10px;padding:7px 14px;border:1px solid var(--border);width:100%;max-width:560px}
+@media(max-width:600px){.desktop-hint{display:none}}
+
+/* LEADERBOARD */
+.lb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:8px}
+.lb-card{background:var(--surface);border:2px solid var(--border);border-radius:16px;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.lb-card h4{font-family:'Fredoka One',cursive;font-size:1rem;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.lb-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:.82rem}
+.lb-row:last-child{border:none}
+.lb-rank{font-family:'Fredoka One',cursive;font-size:1.1rem;width:24px;text-align:center;flex-shrink:0}
+.lb-name{flex:1;font-weight:700}
+.lb-score{font-weight:900;font-size:.95rem}
+
+/* ARCADE MENU */
+.arcade-menu{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;width:100%;max-width:560px}
+.arcade-game-card{background:var(--surface);border:3px solid var(--border);border-radius:20px;padding:18px;
+  text-align:center;cursor:pointer;transition:all .18s;position:relative;overflow:hidden;
+  box-shadow:0 4px 14px rgba(0,0,0,.06);}
+.arcade-game-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:5px;background:var(--gc)}
+.arcade-game-card:hover{transform:translateY(-4px) scale(1.03);border-color:var(--gc);box-shadow:0 10px 26px rgba(0,0,0,.12)}
+.arcade-game-card:active{transform:scale(.96)}
+.agc-icon{font-size:2.8rem;margin-bottom:8px}
+.agc-name{font-family:'Fredoka One',cursive;font-size:1.15rem;margin-bottom:3px}
+.agc-cost{font-size:.78rem;font-weight:800;color:var(--muted)}
+.agc-diff{font-size:.7rem;font-weight:800;padding:2px 8px;border-radius:8px;margin-top:5px;display:inline-block}
+.diff-easy{background:#d1fae5;color:#059669}
+.diff-medium{background:#fef3c7;color:#d97706}
+.diff-hard{background:#fee2e2;color:#dc2626}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- HOME -->
+<div class="screen visible" id="homeScreen">
+  <div class="home-title"><h1>⭐ Chore Champions</h1><div class="sub" id="homeDatetime"></div></div>
+  <div class="stars-row">🌟⭐✨💫🌟⭐✨</div>
+  <div class="profile-grid" id="profileGrid"></div>
+  <div class="staff-row" id="staffRow"></div>
+</div>
+
+<!-- PIN -->
+<div class="screen" id="pinScreen">
+  <div class="pin-wrap">
+    <div class="pin-avatar" id="pinAvatar">👤</div>
+    <h2 class="pin-title" id="pinName">Enter PIN</h2>
+    <p class="pin-sub" id="pinSub">Enter your 4-digit PIN</p>
+    <div class="pin-dots" id="pinDots">
+      <div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div>
+    </div>
+    <div class="pin-pad">
+      <button class="pin-key" onclick="pinKey('1')">1</button><button class="pin-key" onclick="pinKey('2')">2</button><button class="pin-key" onclick="pinKey('3')">3</button>
+      <button class="pin-key" onclick="pinKey('4')">4</button><button class="pin-key" onclick="pinKey('5')">5</button><button class="pin-key" onclick="pinKey('6')">6</button>
+      <button class="pin-key" onclick="pinKey('7')">7</button><button class="pin-key" onclick="pinKey('8')">8</button><button class="pin-key" onclick="pinKey('9')">9</button>
+      <button class="pin-key" style="font-size:1rem;color:var(--muted)" onclick="pinDel()">⌫</button>
+      <button class="pin-key" onclick="pinKey('0')">0</button>
+      <button class="pin-key" style="font-size:.78rem;font-family:'Nunito',sans-serif;color:var(--muted)" onclick="goHome()">Back</button>
+    </div>
+    <div class="pin-err" id="pinErr">Wrong PIN! Try again 😬</div>
+    <div class="pin-hint" id="pinHint"></div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div class="screen" id="mainApp">
+  <div class="app-header">
+    <div class="logo">⭐ Champions</div>
+    <div class="user-pill"><span id="userEm">👤</span>&nbsp;<span id="userName">User</span></div>
+    <div class="header-right">
+      <button class="icon-btn" onclick="openSettings()" title="Settings">⚙️</button>
+      <button class="icon-btn" onclick="goHome()" title="Log out">🚪</button>
+    </div>
+  </div>
+  <div class="tab-bar" id="tabBar"></div>
+  <div class="tab-content" id="tabContent"></div>
+</div>
+
+<!-- ARCADE SCREEN -->
+<div class="screen" id="arcadeScreen">
+  <div class="arcade-wrap" id="arcadeWrap"><!-- filled dynamically --></div>
+</div>
+
+</div><!-- #app -->
+
+<div id="notif"></div>
+<div class="confetti-wrap" id="confettiWrap"></div>
+
+<!-- REWARD MODAL -->
+<div class="modal-overlay" id="rewardModal">
+  <div class="modal-box">
+    <h3 id="rewardModalTitle">➕ Add Reward</h3>
+    <div class="form-row" style="align-items:center;margin-bottom:10px">
+      <button type="button" onclick="openEmojiPicker('rw-icon-val')" style="font-size:2rem;padding:6px 12px;border-radius:12px;border:2px solid var(--border);background:var(--surface2);cursor:pointer;transition:all .15s" id="rw-icon-preview">🎁</button>
+      <input type="hidden" id="rw-icon-val" value="🎁">
+      <span style="font-size:.78rem;color:var(--muted);font-weight:700">← Tap to change icon</span>
+    </div>
+    <div class="form-row"><input class="f-inp" id="rw-name-in" placeholder="Reward name" style="flex:1"></div>
+    <div class="form-row"><input class="f-inp" id="rw-cost-in" type="number" min="1" placeholder="Points cost"><input class="f-inp" id="rw-desc-in" placeholder="Description"></div>
+    <div class="form-row" style="margin-top:10px"><button class="btn btn-primary" onclick="saveReward()">Save</button><button class="btn btn-outline" onclick="closeModal('rewardModal')">Cancel</button></div>
+  </div>
+</div>
+
+<!-- EMOJI PICKER MODAL -->
+<div class="modal-overlay" id="emojiModal">
+  <div class="modal-box" style="max-width:380px">
+    <h3>😊 Pick an Icon</h3>
+    <input class="ep-input" id="emojiSearch" placeholder="Type to filter emojis..." oninput="filterEmojis(this.value)">
+    <div class="emoji-grid" id="emojiGrid"></div>
+    <div class="form-row" style="margin-top:12px">
+      <span style="font-size:.85rem;font-weight:700;color:var(--muted)">Or type custom:</span>
+      <input class="f-inp" id="emojiCustom" placeholder="✨" maxlength="4" style="max-width:70px;font-size:1.2rem;text-align:center">
+      <button class="btn btn-gold" onclick="pickCustomEmoji()">Use</button>
+    </div>
+    <button class="btn btn-outline" style="margin-top:8px;width:100%" onclick="closeModal('emojiModal')">Cancel</button>
+  </div>
+</div>
+
+<!-- PROFILE EDIT MODAL -->
+<div class="modal-overlay" id="profileEditModal">
+  <div class="modal-box" style="max-width:380px">
+    <h3 id="peTitle">✏️ Edit Profile</h3>
+    <div style="text-align:center;margin-bottom:16px">
+      <div class="parent-avatar-circle" style="margin:0 auto 8px;width:72px;height:72px;font-size:2.6rem;border-color:#f59e0b" onclick="openEmojiPicker('pe-emoji')" id="peAvatarPreview">👤</div>
+      <div style="font-size:.78rem;color:var(--muted);font-weight:700">Tap to change icon</div>
+    </div>
+    <input type="hidden" id="pe-emoji">
+    <div style="margin-bottom:8px">
+      <div style="font-size:.82rem;font-weight:800;color:var(--muted);margin-bottom:4px">Name</div>
+      <input class="f-inp" id="pe-name" placeholder="Name" style="width:100%">
+    </div>
+    <div style="margin-bottom:8px" id="pe-pin-wrap">
+      <div style="font-size:.82rem;font-weight:800;color:var(--muted);margin-bottom:4px">PIN (4 digits)</div>
+      <input class="f-inp" id="pe-pin" placeholder="0000" maxlength="4" style="width:100%">
+    </div>
+    <div style="margin-bottom:8px" id="pe-bedtime-wrap" style="display:none">
+      <div style="font-size:.82rem;font-weight:800;color:var(--muted);margin-bottom:4px">🌙 Bedtime</div>
+      <input type="time" id="pe-bedtime" style="width:100%">
+    </div>
+    <div class="form-row" style="margin-top:14px">
+      <button class="btn btn-primary" onclick="saveProfileEdit()">Save</button>
+      <button class="btn btn-outline" onclick="closeModal('profileEditModal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- REWARD APPROVAL MODAL (parent) -->
+<div class="modal-overlay" id="rewardApprovalModal">
+  <div class="modal-box" style="max-width:420px">
+    <h3>🎁 Reward Requests</h3>
+    <div id="rewardApprovalList"></div>
+    <button class="btn btn-outline" style="margin-top:12px;width:100%" onclick="closeModal('rewardApprovalModal')">Close</button>
+  </div>
+</div>
+
+<!-- CHORE MODAL -->
+<div class="modal-overlay" id="choreModal">
+  <div class="modal-box">
+    <h3 id="choreModalTitle">➕ Add Chore</h3>
+    <div class="form-row"><input class="f-inp" id="ch-name-in" placeholder="Chore name" style="flex:1"></div>
+    <div style="margin:8px 0 5px;font-size:.83rem;font-weight:800;color:var(--muted)">Assigned to:</div>
+    <div class="form-row" id="ch-kids-row"></div>
+    <div style="margin:8px 0 5px;font-size:.83rem;font-weight:800;color:var(--muted)">Days (empty = every day):</div>
+    <div class="day-tags-wrap" id="ch-days-row">
+      <span class="day-tag" data-day="Mon">Mon</span><span class="day-tag" data-day="Tue">Tue</span><span class="day-tag" data-day="Wed">Wed</span><span class="day-tag" data-day="Thu">Thu</span><span class="day-tag" data-day="Fri">Fri</span><span class="day-tag" data-day="Sat">Sat</span><span class="day-tag" data-day="Sun">Sun</span>
+    </div>
+    <div class="form-row" style="margin-top:14px"><button class="btn btn-primary" onclick="saveChore()">Save Chore</button><button class="btn btn-outline" onclick="closeModal('choreModal')">Cancel</button></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// DEVICE DETECTION
+// ═══════════════════════════════════════════════════════
+const IS_MOBILE = /Mobi|Android|iPhone|iPad|iPod|Touch/i.test(navigator.userAgent) || ('ontouchstart' in window) || window.innerWidth < 600;
+
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+const DAYS_SHORT=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const TODAY_NAME=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()];
+const KC=['#ff3d6e','#00b896','#ff7a00','#7c3aed'];
+const KB=['rgba(255,61,110,.08)','rgba(0,184,150,.08)','rgba(255,122,0,.08)','rgba(124,58,237,.08)'];
+const KBD=['#ffc5d2','#a7f3e0','#ffd8b0','#ddd6fe'];
+
+const GAME_DEFS=[
+  {id:'pong',     name:'Ping Pong', icon:'🏓', color:'#ff3d6e', cost:1, winScore:5,  desc:'Beat CPU to 5'},
+  {id:'snake',    name:'Snake',     icon:'🐍', color:'#10b981', cost:1, winScore:10, desc:'Eat 10 apples'},
+  {id:'breakout', name:'Breakout',  icon:'🧱', color:'#f59e0b', cost:1, winScore:0,  desc:'Clear all bricks'},
+  {id:'space',    name:'Invaders',  icon:'🚀', color:'#0ea5e9', cost:1, winScore:0,  desc:'Defeat all aliens'},
+  {id:'dino',     name:'Dino Run',  icon:'🦕', color:'#ff7a00', cost:1, winScore:20, desc:'Survive 20 obstacles'},
+];
+
+let state={
+  kids:[
+    {id:0,name:'Legend',emoji:'🦅',pin:'1111',bedtime:'20:30',points:0,pointLog:[],loggedInAt:null,approvedAt:null,homeTime:null,tidyChecked:false,tidySigned:false},
+    {id:1,name:'Luke',  emoji:'🐉',pin:'2222',bedtime:'20:30',points:0,pointLog:[],loggedInAt:null,approvedAt:null,homeTime:null,tidyChecked:false,tidySigned:false},
+    {id:2,name:'Dom',   emoji:'🔥',pin:'3333',bedtime:'21:00',points:0,pointLog:[],loggedInAt:null,approvedAt:null,homeTime:null,tidyChecked:false,tidySigned:false},
+    {id:3,name:'Chase', emoji:'⚡',pin:'4444',bedtime:'21:00',points:0,pointLog:[],loggedInAt:null,approvedAt:null,homeTime:null,tidyChecked:false,tidySigned:false},
+  ],
+  supervisors:[{id:'s0',name:'Supervisor',emoji:'👁️',pin:'5678',role:'supervisor'}],
+  parents:[{id:'p0',name:'Parent',emoji:'👑',pin:'1234',role:'parent'}],
+  chores:[
+    {id:0,name:'Make your bed',        kids:[0,1,2,3],days:[]},
+    {id:1,name:'Tidy your bedroom',    kids:[0,1,2,3],days:[]},
+    {id:2,name:'Set / clear table',    kids:[0,1,2,3],days:['Mon','Tue','Wed','Thu','Fri']},
+    {id:3,name:'Take out trash',       kids:[0,1,2,3],days:['Mon','Wed','Fri']},
+    {id:4,name:'Vacuum living room',   kids:[0,1,2,3],days:['Sat','Sun']},
+    {id:5,name:'Wash dishes',          kids:[0,1,2,3],days:[]},
+  ],
+  choreState:{},
+  rewards:[
+    {id:0,icon:'📱',name:'Extra Screen Time',cost:5,desc:'1 hour extra screen time'},
+    {id:1,icon:'🍕',name:'Pick Dinner',       cost:8,desc:'You choose dinner'},
+    {id:2,icon:'🎮',name:'Game Night Pick',   cost:6,desc:'You pick the family game'},
+    {id:3,icon:'🛍️',name:'$5 Bonus',          cost:10,desc:'Extra $5 allowance'},
+    {id:4,icon:'🎬',name:'Movie Night Pick',  cost:7,desc:'You choose the movie'},
+    {id:5,icon:'🍦',name:'Ice Cream Trip',    cost:5,desc:'Trip to ice cream spot'},
+    {id:6,icon:'😴',name:'Stay Up Late',      cost:4,desc:'30 min extra past bedtime'},
+    {id:7,icon:'🎁',name:'$10 Store Credit',  cost:15,desc:'Spend $10 at fave store'},
+  ],
+  nextRewardId:8, nextChoreId:6,
+  rewardRequests:[],
+  // difficulty per game: easy|medium|hard
+  gameDifficulty:{pong:'medium',snake:'medium',breakout:'medium',space:'medium',dino:'medium'},
+  // leaderboard: { gameId: [ {name, emoji, score, kidId} ] }  (top 5 per game)
+  leaderboard:{pong:[],snake:[],breakout:[],space:[],dino:[]},
+};
+
+let session={type:null,id:null};
+let activeTab='';
+let editingRewardId=null,editingChoreId=null,pinTarget=null,pinBuf='';
+let currentGameId=null,currentGameKidId=null;
+
+// helpers
+function csKey(k,c){return`${k}_${c}`}
+function getCS(k,c){return state.choreState[csKey(k,c)]||{checked:false,signed:false,cancelled:false,checkedAt:null}}
+function setCS(k,c,p){state.choreState[csKey(k,c)]=Object.assign(getCS(k,c),p)}
+function kidChores(id){return state.chores.filter(c=>c.kids.includes(id)&&(c.days.length===0||c.days.includes(TODAY_NAME)))}
+function allSigned(id){return kidChores(id).every(c=>{const s=getCS(id,c.id);return s.signed||s.cancelled})}
+function getKid(id){return state.kids.find(k=>k.id===id)}
+function getDiff(gameId){return state.gameDifficulty[gameId]||'medium'}
+
+// ═══ CLOCK ═══
+function tick(){
+  const now=new Date();
+  const el=document.getElementById('homeDatetime');
+  if(el)el.textContent=now.toLocaleString([],{weekday:'long',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+setInterval(tick,1000);tick();
+
+// ═══ NOTIFY ═══
+let ntTimer;
+function notify(msg,color='#10b981'){
+  const n=document.getElementById('notif');
+  n.textContent=msg;n.style.borderColor=color;n.style.display='block';
+  clearTimeout(ntTimer);ntTimer=setTimeout(()=>n.style.display='none',3200);
+}
+
+// ═══ CONFETTI ═══
+function confetti(){
+  const w=document.getElementById('confettiWrap');w.innerHTML='';w.style.display='block';
+  const cols=['#ff3d6e','#ff7a00','#f59e0b','#10b981','#0ea5e9','#7c3aed'];
+  for(let i=0;i<70;i++){
+    const p=document.createElement('div');p.className='confetti-piece';
+    const sz=6+Math.random()*10;
+    p.style.cssText=`left:${Math.random()*100}%;top:-20px;background:${cols[i%6]};
+      animation-duration:${1.2+Math.random()*1.8}s;animation-delay:${Math.random()*.8}s;
+      width:${sz}px;height:${sz}px;border-radius:${Math.random()>.5?'50%':'3px'}`;
+    w.appendChild(p);
+  }
+  setTimeout(()=>{w.style.display='none';w.innerHTML=''},3500);
+}
+
+// ═══ SCREENS ═══
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('visible'));
+  document.getElementById(id).classList.add('visible');
+  if(id==='homeScreen')renderHome();
+}
+function goHome(){
+  stopCurrentGame();
+  session={type:null,id:null};pinBuf='';
+  showScreen('homeScreen');
+}
+
+// ═══ HOME ═══
+function renderHome(){
+  document.getElementById('profileGrid').innerHTML=state.kids.map((k,i)=>`
+    <div class="profile-card" style="--clr:${KC[i]}" onclick="startPin('kid',${k.id})">
+      <div class="profile-dot" style="background:${KC[i]};box-shadow:0 0 0 3px white,0 0 0 5px ${KC[i]}"></div>
+      <span class="profile-emoji">${k.emoji}</span>
+      <div class="profile-name" style="color:${KC[i]}">${k.name}</div>
+      <div class="profile-pts">${k.points} ⭐ pts</div>
+    </div>`).join('');
+  const allStaff=[
+    ...state.supervisors.map(s=>({...s,type:'supervisor',clr:'#7c3aed'})),
+    ...state.parents.map(p=>({...p,type:'parent',clr:'#d97706'})),
+  ];
+  document.getElementById('staffRow').innerHTML=allStaff.map(s=>`
+    <button class="staff-btn" style="--clr:${s.clr}" onclick="startPin('${s.type}','${s.id}')">
+      <span>${s.emoji}</span>${s.name}
+    </button>`).join('');
+}
+
+// ═══ PIN ═══
+function startPin(type,id){
+  pinTarget={type,id};pinBuf='';updatePinDots();
+  document.getElementById('pinErr').style.display='none';
+  let p;
+  if(type==='kid')p=getKid(id);
+  else if(type==='supervisor')p=state.supervisors.find(s=>s.id===id);
+  else p=state.parents.find(x=>x.id===id);
+  const fill=type==='kid'?KC[id]:type==='supervisor'?'#7c3aed':'#f59e0b';
+  document.getElementById('pinAvatar').textContent=p?.emoji||'👤';
+  document.getElementById('pinName').textContent=p?.name||'User';
+  document.getElementById('pinHint').textContent=type==='parent'?'(Default: 1234)':type==='supervisor'?'(Default: 5678)':`(Default: ${['1111','2222','3333','4444'][id]||'0000'})`;
+  document.querySelectorAll('.pin-dot').forEach(d=>d.style.setProperty('--fill',fill));
+  showScreen('pinScreen');
+}
+function pinKey(d){if(pinBuf.length>=4)return;pinBuf+=d;updatePinDots();if(pinBuf.length===4)checkPin();}
+function pinDel(){pinBuf=pinBuf.slice(0,-1);updatePinDots();}
+function updatePinDots(){for(let i=0;i<4;i++)document.getElementById('pd'+i).classList.toggle('filled',i<pinBuf.length);}
+function checkPin(){
+  const{type,id}=pinTarget;
+  let p;
+  if(type==='kid')p=getKid(id);
+  else if(type==='supervisor')p=state.supervisors.find(s=>s.id===id);
+  else p=state.parents.find(x=>x.id===id);
+  if(p&&pinBuf===p.pin){session={type,id};enterApp(type,id);}
+  else{
+    const e=document.getElementById('pinErr');e.style.display='block';
+    pinBuf='';updatePinDots();setTimeout(()=>e.style.display='none',2000);
+  }
+}
+function enterApp(type,id){
+  let p;
+  if(type==='kid')p=getKid(id);
+  else if(type==='supervisor')p=state.supervisors.find(s=>s.id===id);
+  else p=state.parents.find(x=>x.id===id);
+  document.getElementById('userEm').textContent=p?.emoji||'👤';
+  document.getElementById('userName').textContent=p?.name||'User';
+  showScreen('mainApp');buildTabs(type,id);
+  notify(`Welcome, ${p?.name}! 👋`,'#ff7a00');
+}
+
+// ═══ TABS ═══
+function buildTabs(type,id){
+  let tabs=[];
+  if(type==='kid') tabs=[{id:'chores',label:'📋 Chores'},{id:'points',label:'⭐ Points'},{id:'rewards',label:'🎁 Rewards'},{id:'arcade',label:'🎮 Arcade'},{id:'leaderboard',label:'🏆 Scores'}];
+  else if(type==='supervisor'){tabs=[{id:'signoff',label:'✅ Sign Off'}];state.kids.forEach(k=>tabs.push({id:`view-${k.id}`,label:`${k.emoji} ${k.name}`}));}
+  else{
+    const pendingReqs=(state.rewardRequests||[]).filter(r=>r.status==='pending').length;
+    const rwLabel=pendingReqs>0?`🎁 Rewards <span style="background:#ef4444;color:white;border-radius:10px;padding:1px 6px;font-size:.7rem">${pendingReqs}</span>`:'🎁 Rewards';
+    tabs=[{id:'overview',label:'📊 Overview'},{id:'rewards',label:rwLabel,raw:true},{id:'leaderboard',label:'🏆 Scores'},{id:'settings',label:'⚙️ Settings'}];
+    state.kids.forEach(k=>tabs.push({id:`parent-${k.id}`,label:`${k.emoji} ${k.name}`}));
+  }
+  activeTab=tabs[0].id;
+  document.getElementById('tabBar').innerHTML=tabs.map(t=>`<button class="tab-btn${t.id===activeTab?' active':''}" onclick="switchTab('${t.id}')">${t.raw?t.label:t.label}</button>`).join('');
+  renderTab(type,id);
+}
+function switchTab(tabId){
+  activeTab=tabId;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.getAttribute('onclick')===`switchTab('${tabId}')`));
+  renderTab(session.type,session.id);
+}
+function renderTab(type,id){
+  const c=document.getElementById('tabContent');
+  if(type==='kid'){
+    const kid=getKid(id);
+    if(activeTab==='chores') c.innerHTML=renderKidChores(kid);
+    else if(activeTab==='points') c.innerHTML=renderKidPoints(kid);
+    else if(activeTab==='rewards') c.innerHTML=renderRewards(false);
+    else if(activeTab==='arcade') c.innerHTML=renderArcadeMenu(id);
+    else if(activeTab==='leaderboard') c.innerHTML=renderLeaderboard();
+  } else if(type==='supervisor'){
+    if(activeTab==='signoff') c.innerHTML=renderSignOff();
+    else c.innerHTML=renderKidChores(getKid(parseInt(activeTab.split('-')[1])));
+  } else {
+    if(activeTab==='overview') c.innerHTML=renderParentOverview();
+    else if(activeTab==='rewards') c.innerHTML=renderRewards(true);
+    else if(activeTab==='leaderboard') c.innerHTML=renderLeaderboard();
+    else if(activeTab==='settings'){renderSettings();return;}
+    else c.innerHTML=renderParentKid(parseInt(activeTab.split('-')[1]));
+  }
+}
+
+// ═══ KID CHORES ═══
+function renderKidChores(kid){
+  if(!kid)return'';
+  const i=kid.id,chores=kidChores(i);
+  const done=chores.filter(c=>getCS(i,c.id).checked).length;
+  const signed=chores.filter(c=>getCS(i,c.id).signed).length;
+  const pct=chores.length?Math.round(signed/chores.length*100):100;
+  const mins=kid.homeTime?Math.floor((new Date()-kid.homeTime)/60000):null;
+  let timerHtml='';
+  if(mins!==null&&!kid.approvedAt){
+    if(mins<=60)timerHtml=`<span class="timer-chip timer-2pt">⏱ ${mins}m — 2pts!</span>`;
+    else if(mins<=120)timerHtml=`<span class="timer-chip timer-1pt">⏱ ${mins}m — 1pt!</span>`;
+    else timerHtml=`<span class="timer-chip timer-out">⏱ ${mins}m</span>`;
+  }
+  const approvalHtml=kid.approvedAt
+    ?`<div class="free-time-banner approved">🎉<div><strong>FREE TIME!</strong><br><span style="font-size:.8rem;font-weight:600">Approved ${kid.approvedAt.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span></div></div>`
+    :kid.homeTime?`<div class="free-time-banner waiting">⏳<div>${signed}/${chores.length} signed ${timerHtml}</div></div>`:'';
+  const loginHtml=!kid.loggedInAt
+    ?`<div class="card" style="text-align:center;padding:20px;background:${KB[i]};border-color:${KBD[i]}">
+        <div style="font-size:2.5rem;margin-bottom:7px">🏠</div>
+        <div style="font-weight:800;margin-bottom:12px">Tap when you're home to start your timer!</div>
+        <button class="btn btn-green" onclick="loginKid(${i})">I'm Home! 🏠</button>
+      </div>`
+    :`<div style="font-size:.8rem;color:var(--muted);margin-bottom:10px;font-weight:700">🏠 Home since <strong>${kid.homeTime.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</strong></div>`;
+  const choreRows=chores.map(c=>{
+    const cs=getCS(i,c.id);const disabled=cs.cancelled||cs.signed||!kid.loggedInAt;
+    const bx=cs.signed?'signed':cs.checked?'checked':'';
+    const rc=cs.cancelled?'is-cancelled':cs.signed?'is-signed':cs.checked?'is-done':'';
+    const dl=c.days.length?`<span class="chore-day-tag">${c.days.join('·')}</span>`:'';
+    const bg=cs.cancelled?'<span class="badge badge-cancelled">Cancelled</span>':cs.signed?'<span class="badge badge-signed">✓ Signed</span>':cs.checked?'<span class="badge badge-done">Done!</span>':'<span class="badge badge-pending">To Do</span>';
+    return`<div class="chore-row ${rc}">
+      <div class="chore-check-box ${bx}" onclick="${disabled?'':`toggleChore(${i},${c.id})`}" style="${disabled?'cursor:default':''}">${cs.signed||cs.checked?'✓':''}</div>
+      <div class="chore-info"><div class="chore-name">${c.name} ${dl}</div>${cs.checkedAt?`<div class="chore-meta">${cs.checkedAt.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>`:''}</div>${bg}</div>`;
+  }).join('');
+  const tidyRow=`<div class="section-head">🌙 Before Bed</div>
+    <div class="chore-row ${kid.tidySigned?'is-signed':kid.tidyChecked?'is-done':''}">
+      <div class="chore-check-box ${kid.tidySigned?'signed':kid.tidyChecked?'checked':''}" onclick="toggleTidy(${i})">${kid.tidyChecked?'✓':''}</div>
+      <div class="chore-info"><div class="chore-name">Tidy up chore area 🧹</div><div class="chore-meta">+1 ⭐ when signed</div></div>
+      ${kid.tidySigned?'<span class="badge badge-signed">+1 ⭐</span>':kid.tidyChecked?'<span class="badge badge-done">Awaiting sign-off</span>':''}
+    </div>`;
+  return`<div class="kid-hero" style="background:${KB[i]};border:2px solid ${KBD[i]};border-radius:18px">
+    <div class="kid-hero-dots"></div>
+    <div class="kid-hero-inner">
+      <div class="kid-big-emoji">${kid.emoji}</div>
+      <div style="flex:1"><h2 style="color:${KC[i]};font-size:1.7rem">${kid.name}</h2>
+        <div style="color:var(--muted);font-size:.83rem;font-weight:700">Today · ${TODAY_NAME}</div>
+        <div class="kid-stat-row"><div class="stat-chip">⭐ ${kid.points}</div><div class="stat-chip">📋 ${done}/${chores.length}</div><div class="stat-chip">✅ ${signed}</div></div>
+      </div></div></div>
+    <div class="progress-wrap"><div class="progress-label"><span>Progress</span><span style="color:${KC[i]}">${pct}%</span></div>
+      <div class="progress-track"><div class="progress-fill" style="width:${pct}%;background:${KC[i]}"></div></div></div>
+    ${approvalHtml}${loginHtml}
+    <div class="section-head">📋 Today's Chores</div>
+    ${choreRows||'<div style="color:var(--muted);text-align:center;padding:16px;font-weight:700">No chores today! 🎉</div>'}
+    ${tidyRow}`;
+}
+
+function renderKidPoints(kid){
+  const rows=kid.pointLog.slice(0,25).map(e=>`<div class="pts-row"><span style="color:var(--muted)">${e.time} — ${e.reason}</span><span class="${e.amount>0?'pts-pos':'pts-neg'}">${e.amount>0?'+':''}${e.amount}</span></div>`).join('')||'<div style="color:var(--muted);padding:14px;text-align:center;font-weight:700">No points yet — do your chores! 💪</div>';
+  return`<div style="text-align:center;padding:18px 0 24px">
+    <div style="font-size:5rem;font-family:'Fredoka One',cursive;color:${KC[kid.id]};line-height:1">${kid.points}</div>
+    <div style="font-size:1rem;color:var(--muted);font-weight:800">Total Points ⭐</div></div>
+    <div class="section-head">📜 Point History</div>
+    <div class="pts-log card">${rows}</div>`;
+}
+
+// ═══ ARCADE MENU ═══
+function renderArcadeMenu(kidId){
+  const kid=getKid(kidId);
+  const cards=GAME_DEFS.map(g=>{
+    const diff=getDiff(g.id);
+    const diffCls=diff==='easy'?'diff-easy':diff==='hard'?'diff-hard':'diff-medium';
+    const diffLabel=diff.charAt(0).toUpperCase()+diff.slice(1);
+    return`<div class="arcade-game-card" style="--gc:${g.color}" onclick="launchGame('${g.id}',${kidId})">
+      <div class="agc-icon">${g.icon}</div>
+      <div class="agc-name">${g.name}</div>
+      <div class="agc-cost">1 ⭐ to play · Win = +2 ⭐</div>
+      <div class="agc-diff ${diffCls}">${diffLabel}</div>
+    </div>`;}).join('');
+  return`<h2 class="fredoka" style="margin-bottom:4px">🎮 Arcade</h2>
+    <p style="color:var(--muted);font-size:.82rem;font-weight:700;margin-bottom:14px">Spend 1 ⭐ to play · Beat the game = +2 ⭐ back · ${kid.emoji} ${kid.name} has <strong>${kid.points} ⭐</strong></p>
+    ${kid.points<1?'<div class="card" style="background:#fee2e2;border-color:#fecaca;color:#991b1b;font-weight:800;text-align:center;padding:16px">Not enough points to play! Earn more by doing chores! 💪</div>':''}
+    <div class="arcade-menu">${cards}</div>`;
+}
+
+// ═══ LEADERBOARD ═══
+function renderLeaderboard(){
+  const cards=GAME_DEFS.map(g=>{
+    const lb=state.leaderboard[g.id]||[];
+    const rows=lb.length?lb.slice(0,5).map((e,i)=>{
+      const medals=['🥇','🥈','🥉','4️⃣','5️⃣'];
+      return`<div class="lb-row"><div class="lb-rank">${medals[i]}</div><span style="font-size:1rem">${e.emoji}</span><div class="lb-name">${e.name}</div><div class="lb-score" style="color:${g.color}">${e.score}</div></div>`;
+    }).join(''):'<div style="color:var(--muted);font-size:.8rem;padding:4px 0">No scores yet — play to get on the board!</div>';
+    const diff=getDiff(g.id);const diffCls=diff==='easy'?'diff-easy':diff==='hard'?'diff-hard':'diff-medium';
+    return`<div class="lb-card"><h4>${g.icon} ${g.name} <span class="agc-diff ${diffCls}" style="font-size:.65rem">${diff}</span></h4>${rows}</div>`;
+  }).join('');
+  return`<h2 class="fredoka" style="margin-bottom:4px">🏆 Leaderboard</h2>
+    <p style="color:var(--muted);font-size:.82rem;font-weight:700;margin-bottom:12px">Family high scores — can you beat the record?</p>
+    <div class="lb-grid">${cards}</div>`;
+}
+
+function updateLeaderboard(gameId,kidId,score){
+  const kid=getKid(kidId);
+  if(!kid)return;
+  if(!state.leaderboard[gameId])state.leaderboard[gameId]=[];
+  const lb=state.leaderboard[gameId];
+  // Update or add entry for this kid
+  const existing=lb.findIndex(e=>e.kidId===kidId);
+  if(existing>=0){
+    if(score>lb[existing].score)lb[existing].score=score;
+  } else {
+    lb.push({kidId,name:kid.name,emoji:kid.emoji,score});
+  }
+  lb.sort((a,b)=>b.score-a.score);
+  // Check if new high score
+  const rank=lb.findIndex(e=>e.kidId===kidId);
+  if(rank===0) notify(`🏆 ${kid.name} has the new high score in ${GAME_DEFS.find(g=>g.id===gameId).name}!`,'#f59e0b');
+}
+
+// ═══ GAME LAUNCH ═══
+function launchGame(gameId,kidId){
+  const kid=getKid(kidId);
+  if(kid.points<1){notify('Not enough points!','#ef4444');return;}
+  kid.points=Math.max(0,kid.points-1);
+  kid.pointLog.unshift({amount:-1,reason:`🎮 Played ${GAME_DEFS.find(g=>g.id===gameId).name}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+  currentGameId=gameId;currentGameKidId=kidId;
+  buildArcadeScreen(gameId,kidId);
+  showScreen('arcadeScreen');
+}
+
+function buildArcadeScreen(gameId,kidId){
+  const kid=getKid(kidId);
+  const g=GAME_DEFS.find(x=>x.id===gameId);
+  const wrap=document.getElementById('arcadeWrap');
+  wrap.innerHTML=`
+    <div class="arcade-header">
+      <button class="btn btn-outline btn-sm" onclick="exitGame()">← Back</button>
+      <h2>${g.icon} ${g.name}</h2>
+      <div class="arcade-pts-badge" id="arcadePtsBadge">${kid.emoji} ${kid.name} · ${kid.points} ⭐</div>
+    </div>
+    <div class="game-score-bar" id="gameScoreBar"></div>
+    <div class="game-canvas-wrap">
+      <canvas id="gameCanvas"></canvas>
+      <div class="game-overlay" id="gameOverlay">
+        <div class="go-icon" id="goIcon">${g.icon}</div>
+        <div class="go-title" id="goTitle">Ready?</div>
+        <div class="go-msg" id="goMsg">${IS_MOBILE?'Use buttons below':'Use keyboard controls'} · Beat the game to earn 2 ⭐ back!</div>
+        <button class="btn btn-sky" id="goBtn" onclick="startCurrentGame()">▶ Start!</button>
+      </div>
+    </div>
+    <div class="mobile-controls" id="mobileControls"></div>
+    <div class="desktop-hint" id="desktopHint"></div>`;
+
+  // Size canvas
+  setTimeout(()=>{
+    const cv=document.getElementById('gameCanvas');
+    const maxW=Math.min(560,wrap.offsetWidth-4);
+    cv.width=maxW; cv.height=Math.round(maxW*0.62);
+    initGame(gameId);
+  },60);
+}
+
+// ═══════════════════════════════════════════════════════
+// GAME ENGINE
+// ═══════════════════════════════════════════════════════
+let gameRAF=null,gameRunning=false,gameState={};
+
+function stopCurrentGame(){
+  gameRunning=false;
+  if(gameRAF){cancelAnimationFrame(gameRAF);gameRAF=null;}
+}
+
+function exitGame(){
+  stopCurrentGame();
+  showScreen('mainApp');
+  renderTab(session.type,session.id);
+}
+
+function startCurrentGame(){
+  if(!currentGameId)return;
+  hideOverlay();
+  gameRunning=true;
+  gameRAF=requestAnimationFrame(gameLoop);
+}
+
+function gameLoop(){
+  if(!gameRunning)return;
+  const cv=document.getElementById('gameCanvas');
+  if(!cv){gameRunning=false;return;}
+  if(currentGameId==='pong')updatePong();
+  else if(currentGameId==='snake')updateSnake();
+  else if(currentGameId==='breakout')updateBreakout();
+  else if(currentGameId==='space')updateSpace();
+  else if(currentGameId==='dino')updateDino();
+  gameRAF=requestAnimationFrame(gameLoop);
+}
+
+function initGame(id){
+  if(id==='pong')initPong();
+  else if(id==='snake')initSnake();
+  else if(id==='breakout')initBreakout();
+  else if(id==='space')initSpace();
+  else if(id==='dino')initDino();
+}
+
+function showOverlay(icon,title,msg,btnTxt,btnFn){
+  const o=document.getElementById('gameOverlay');if(!o)return;
+  document.getElementById('goIcon').textContent=icon;
+  document.getElementById('goTitle').textContent=title;
+  document.getElementById('goMsg').textContent=msg;
+  const b=document.getElementById('goBtn');b.textContent=btnTxt;b.onclick=btnFn;
+  o.classList.remove('hidden');
+}
+function hideOverlay(){const o=document.getElementById('gameOverlay');if(o)o.classList.add('hidden');}
+
+function setScoreBar(items){
+  const bar=document.getElementById('gameScoreBar');if(!bar)return;
+  bar.innerHTML=items.map(item=>`<div class="gsb-box"><div class="gsb-label">${item.label}</div><div class="gsb-val" style="color:${item.color||'var(--text)'}">${item.val}</div></div>`).join('');
+}
+
+function onGameWin(score){
+  stopCurrentGame();
+  const kid=getKid(currentGameKidId);const g=GAME_DEFS.find(x=>x.id===currentGameId);
+  kid.points+=2;
+  kid.pointLog.unshift({amount:2,reason:`🎮 Won ${g.name}! Score: ${score}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+  updateLeaderboard(currentGameId,currentGameKidId,score);
+  document.getElementById('arcadePtsBadge').textContent=`${kid.emoji} ${kid.name} · ${kid.points} ⭐`;
+  confetti();
+  showOverlay('🎉','You Won!',`+2 ⭐ earned! Score: ${score}`,'Play Again 🔄',()=>{
+    const kid2=getKid(currentGameKidId);
+    if(kid2.points<1){showOverlay('😢','No Points',`Earn more by doing chores!`,'Go Back',exitGame);return;}
+    kid2.points=Math.max(0,kid2.points-1);
+    kid2.pointLog.unshift({amount:-1,reason:`🎮 Played ${g.name}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+    document.getElementById('arcadePtsBadge').textContent=`${kid2.emoji} ${kid2.name} · ${kid2.points} ⭐`;
+    initGame(currentGameId);startCurrentGame();
+  });
+}
+
+function onGameLose(score){
+  stopCurrentGame();
+  const g=GAME_DEFS.find(x=>x.id===currentGameId);
+  updateLeaderboard(currentGameId,currentGameKidId,score);
+  showOverlay('😢','Game Over!',`Score: ${score} · Point was used. Try again?`,'Try Again (1 ⭐)',()=>{
+    const kid=getKid(currentGameKidId);
+    if(kid.points<1){showOverlay('😢','No Points','Earn more by doing chores!','Go Back',exitGame);return;}
+    kid.points=Math.max(0,kid.points-1);
+    kid.pointLog.unshift({amount:-1,reason:`🎮 Played ${g.name}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+    document.getElementById('arcadePtsBadge').textContent=`${getKid(currentGameKidId).emoji} ${getKid(currentGameKidId).name} · ${getKid(currentGameKidId).points} ⭐`;
+    initGame(currentGameId);startCurrentGame();
+  });
+}
+
+function getCanvas(){return document.getElementById('gameCanvas');}
+function getCtx(){return getCanvas()?.getContext('2d');}
+function cW(){return getCanvas()?.width||520;}
+function cH(){return getCanvas()?.height||320;}
+
+// ─────────────────── PONG ───────────────────
+function initPong(){
+  const diff=getDiff('pong');
+  const cpuSpeed=diff==='easy'?2.2:diff==='hard'?5.5:3.5;
+  const ballSpeed=diff==='easy'?3.5:diff==='hard'?5.5:4.5;
+  gameState.pong={
+    ball:{x:cW()/2,y:cH()/2,vx:ballSpeed,vy:2.5,r:8},
+    player:{y:cH()/2-35,h:60,score:0},
+    cpu:{y:cH()/2-35,h:60,score:0,speed:cpuSpeed},
+    keys:{up:false,down:false},
+    touch:{up:false,down:false},
+    WIN:5,
+  };
+  setScoreBar([{label:'YOU',val:0,color:'#ff3d6e'},{label:'CPU',val:0,color:'#7c3aed'}]);
+  setupMobileControls([
+    {label:'▲',id:'pu',onStart:()=>gameState.pong.touch.up=true,onEnd:()=>gameState.pong.touch.up=false},
+    {label:'▼',id:'pd',onStart:()=>gameState.pong.touch.down=true,onEnd:()=>gameState.pong.touch.down=false},
+  ]);
+  document.getElementById('desktopHint').textContent='⌨️ W/S or ↑/↓ to move paddle · First to 5 wins!';
+  drawPong();
+}
+
+function resetPongBall(dir){
+  const W=cW(),H=cH(),p=gameState.pong;
+  p.ball.x=W/2;p.ball.y=H/2;
+  const ang=(Math.random()-.5)*.7;
+  const sp=Math.sqrt(p.ball.vx**2+p.ball.vy**2);
+  p.ball.vx=dir*(sp||4)*Math.cos(ang);
+  p.ball.vy=sp*Math.sin(ang);
+  p.player.y=H/2-30;p.cpu.y=H/2-30;
+}
+
+function updatePong(){
+  const p=gameState.pong,W=cW(),H=cH();
+  const PAD=16,PW=13;
+  const spd=7*(H/320);
+  if(p.keys.up||p.touch.up)p.player.y=Math.max(0,p.player.y-spd);
+  if(p.keys.down||p.touch.down)p.player.y=Math.min(H-p.player.h,p.player.y+spd);
+  // CPU AI
+  const cc=p.cpu.y+p.cpu.h/2,diff2=p.ball.y-cc;
+  const as=Math.min(Math.abs(diff2),p.cpu.speed*(H/320));
+  if(diff2>6)p.cpu.y=Math.min(H-p.cpu.h,p.cpu.y+as);
+  else if(diff2<-6)p.cpu.y=Math.max(0,p.cpu.y-as);
+  // Ball move
+  p.ball.x+=p.ball.vx;p.ball.y+=p.ball.vy;
+  if(p.ball.y-p.ball.r<0){p.ball.y=p.ball.r;p.ball.vy=Math.abs(p.ball.vy);}
+  if(p.ball.y+p.ball.r>H){p.ball.y=H-p.ball.r;p.ball.vy=-Math.abs(p.ball.vy);}
+  // Player paddle
+  const plX=PAD+PW;
+  if(p.ball.vx<0&&p.ball.x-p.ball.r<plX&&p.ball.x-p.ball.r>PAD&&p.ball.y>p.player.y&&p.ball.y<p.player.y+p.player.h){
+    p.ball.x=plX+p.ball.r;
+    const rel=(p.ball.y-(p.player.y+p.player.h/2))/(p.player.h/2);
+    const ang2=rel*.9,sp=Math.sqrt(p.ball.vx**2+p.ball.vy**2)*1.04;
+    p.ball.vx=Math.min(Math.abs(sp*Math.cos(ang2))*1,14);p.ball.vy=sp*Math.sin(ang2);
+  }
+  // CPU paddle
+  const cpX=W-PAD-PW;
+  if(p.ball.vx>0&&p.ball.x+p.ball.r>cpX&&p.ball.x+p.ball.r<W-PAD&&p.ball.y>p.cpu.y&&p.ball.y<p.cpu.y+p.cpu.h){
+    p.ball.x=cpX-p.ball.r;
+    const rel=(p.ball.y-(p.cpu.y+p.cpu.h/2))/(p.cpu.h/2);
+    const ang2=rel*.8,sp=Math.sqrt(p.ball.vx**2+p.ball.vy**2)*1.02;
+    p.ball.vx=-Math.min(Math.abs(sp*Math.cos(ang2)),13);p.ball.vy=sp*Math.sin(ang2);
+  }
+  // Score
+  if(p.ball.x-p.ball.r<0){p.cpu.score++;setScoreBar([{label:'YOU',val:p.player.score,color:'#ff3d6e'},{label:'CPU',val:p.cpu.score,color:'#7c3aed'}]);if(p.cpu.score>=p.WIN){onGameLose(p.player.score);return;}resetPongBall(1);}
+  if(p.ball.x+p.ball.r>W){p.player.score++;setScoreBar([{label:'YOU',val:p.player.score,color:'#ff3d6e'},{label:'CPU',val:p.cpu.score,color:'#7c3aed'}]);if(p.player.score>=p.WIN){onGameWin(p.player.score);return;}resetPongBall(-1);}
+  drawPong();
+}
+
+function drawPong(){
+  const ctx=getCtx();if(!ctx)return;
+  const p=gameState.pong,W=cW(),H=cH(),PAD=16,PW=13;
+  ctx.fillStyle='#1a2744';ctx.fillRect(0,0,W,H);
+  ctx.setLineDash([7,9]);ctx.strokeStyle='rgba(255,255,255,.1)';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(W/2,0);ctx.lineTo(W/2,H);ctx.stroke();ctx.setLineDash([]);
+  ctx.strokeStyle='rgba(255,255,255,.06)';ctx.beginPath();ctx.arc(W/2,H/2,36,0,Math.PI*2);ctx.stroke();
+  // Player paddle
+  const pg=ctx.createLinearGradient(PAD,0,PAD+PW,0);pg.addColorStop(0,'#ff5f7e');pg.addColorStop(1,'#ff3d6e');
+  ctx.fillStyle=pg;ctx.shadowColor='#ff3d6e';ctx.shadowBlur=10;
+  if(ctx.roundRect){ctx.beginPath();ctx.roundRect(PAD,p.player.y,PW,p.player.h,4);ctx.fill();}
+  else{ctx.fillRect(PAD,p.player.y,PW,p.player.h);}
+  // CPU paddle
+  const cg=ctx.createLinearGradient(W-PAD-PW,0,W-PAD,0);cg.addColorStop(0,'#a78bfa');cg.addColorStop(1,'#7c3aed');
+  ctx.fillStyle=cg;ctx.shadowColor='#7c3aed';ctx.shadowBlur=10;
+  if(ctx.roundRect){ctx.beginPath();ctx.roundRect(W-PAD-PW,p.cpu.y,PW,p.cpu.h,4);ctx.fill();}
+  else{ctx.fillRect(W-PAD-PW,p.cpu.y,PW,p.cpu.h);}
+  // Ball
+  const bg=ctx.createRadialGradient(p.ball.x-2,p.ball.y-2,1,p.ball.x,p.ball.y,p.ball.r);
+  bg.addColorStop(0,'#fff9f0');bg.addColorStop(1,'#f59e0b');
+  ctx.fillStyle=bg;ctx.shadowColor='#f59e0b';ctx.shadowBlur=16;
+  ctx.beginPath();ctx.arc(p.ball.x,p.ball.y,p.ball.r,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;
+}
+
+// ─────────────────── SNAKE ───────────────────
+function initSnake(){
+  const diff=getDiff('snake');
+  const speed=diff==='easy'?130:diff==='hard'?55:85;
+  const W=cW(),H=cH(),gs=20;
+  const cols=Math.floor(W/gs),rows=Math.floor(H/gs);
+  gameState.snake={
+    body:[{x:Math.floor(cols/2),y:Math.floor(rows/2)}],
+    dir:{x:1,y:0},nextDir:{x:1,y:0},
+    apple:randomSnakeApple(cols,rows,[{x:Math.floor(cols/2),y:Math.floor(rows/2)}]),
+    score:0,WIN:10,speed,lastMove:0,cols,rows,gs,
+  };
+  setScoreBar([{label:'Score',val:0,color:'#10b981'},{label:'Best',val:getBest('snake'),color:'#f59e0b'}]);
+  setupMobileControls([
+    {label:'▲',id:'su',onStart:()=>{if(gameState.snake.dir.y!==1)gameState.snake.nextDir={x:0,y:-1};}},
+    {label:'▼',id:'sd',onStart:()=>{if(gameState.snake.dir.y!==-1)gameState.snake.nextDir={x:0,y:1};}},
+  ],[
+    {label:'◀',id:'sl',onStart:()=>{if(gameState.snake.dir.x!==1)gameState.snake.nextDir={x:-1,y:0};}},
+    null,
+    {label:'▶',id:'sr',onStart:()=>{if(gameState.snake.dir.x!==-1)gameState.snake.nextDir={x:1,y:0};}},
+  ]);
+  document.getElementById('desktopHint').textContent='⌨️ Arrow keys or WASD to move · Eat 10 apples to win!';
+  drawSnake();
+}
+function randomSnakeApple(cols,rows,body){
+  let a;do{a={x:Math.floor(Math.random()*cols),y:Math.floor(Math.random()*rows)};}
+  while(body.some(b=>b.x===a.x&&b.y===a.y));return a;
+}
+function updateSnake(){
+  const s=gameState.snake;
+  const now=performance.now();
+  if(now-s.lastMove<s.speed)return;
+  s.lastMove=now;s.dir={...s.nextDir};
+  const head={x:s.body[0].x+s.dir.x,y:s.body[0].y+s.dir.y};
+  if(head.x<0||head.x>=s.cols||head.y<0||head.y>=s.rows||s.body.some(b=>b.x===head.x&&b.y===head.y)){
+    onGameLose(s.score);return;
+  }
+  s.body.unshift(head);
+  if(head.x===s.apple.x&&head.y===s.apple.y){
+    s.score++;setScoreBar([{label:'Score',val:s.score,color:'#10b981'},{label:'Best',val:getBest('snake'),color:'#f59e0b'}]);
+    if(s.score>=s.WIN){onGameWin(s.score);return;}
+    s.apple=randomSnakeApple(s.cols,s.rows,s.body);
+  } else s.body.pop();
+  drawSnake();
+}
+function drawSnake(){
+  const ctx=getCtx();if(!ctx)return;
+  const s=gameState.snake,W=cW(),H=cH(),gs=s.gs;
+  ctx.fillStyle='#1a2744';ctx.fillRect(0,0,W,H);
+  // Grid dots
+  ctx.fillStyle='rgba(255,255,255,.04)';
+  for(let x=0;x<s.cols;x++)for(let y=0;y<s.rows;y++){ctx.beginPath();ctx.arc(x*gs+gs/2,y*gs+gs/2,1,0,Math.PI*2);ctx.fill();}
+  // Apple
+  ctx.fillStyle='#ef4444';ctx.shadowColor='#ef4444';ctx.shadowBlur=10;
+  ctx.beginPath();ctx.arc(s.apple.x*gs+gs/2,s.apple.y*gs+gs/2,gs/2-2,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#fbbf24';ctx.beginPath();ctx.arc(s.apple.x*gs+gs/2-2,s.apple.y*gs+2,3,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;
+  // Snake
+  s.body.forEach((seg,i)=>{
+    const t=1-i/s.body.length;
+    ctx.fillStyle=i===0?'#6ee7b7':`rgba(16,185,129,${0.4+t*.6})`;
+    ctx.shadowColor=i===0?'#10b981':'transparent';ctx.shadowBlur=i===0?12:0;
+    const r=i===0?4:3;
+    if(ctx.roundRect){ctx.beginPath();ctx.roundRect(seg.x*gs+1,seg.y*gs+1,gs-2,gs-2,r);ctx.fill();}
+    else{ctx.fillRect(seg.x*gs+1,seg.y*gs+1,gs-2,gs-2);}
+  });
+  ctx.shadowBlur=0;
+}
+
+// ─────────────────── BREAKOUT ───────────────────
+function initBreakout(){
+  const diff=getDiff('breakout');
+  const rows=diff==='easy'?3:diff==='hard'?6:4,cols=8;
+  const W=cW(),H=cH();
+  const bW=(W-20)/cols-4,bH=18;
+  const bricks=[];
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    const colors=['#ff3d6e','#ff7a00','#f59e0b','#10b981','#0ea5e9','#7c3aed'];
+    bricks.push({x:10+c*(bW+4),y:40+r*(bH+5),w:bW,h:bH,alive:true,color:colors[r%6]});
+  }
+  const speed=diff==='easy'?3.5:diff==='hard'?5.5:4.5;
+  const pdW=diff==='easy'?90:diff==='hard'?55:70;
+  gameState.breakout={
+    ball:{x:W/2,y:H-80,vx:speed*(Math.random()>.5?1:-1),vy:-speed,r:7},
+    paddle:{x:W/2-pdW/2,y:H-30,w:pdW,h:12},
+    bricks,score:0,
+    keys:{left:false,right:false},touch:{x:null},
+  };
+  setScoreBar([{label:'Bricks',val:bricks.length,color:'#f59e0b'},{label:'Score',val:0,color:'#ff3d6e'}]);
+  setupMobileControls([
+    {label:'◀',id:'bl',onStart:()=>gameState.breakout.keys.left=true,onEnd:()=>gameState.breakout.keys.left=false},
+    {label:'▶',id:'br',onStart:()=>gameState.breakout.keys.right=true,onEnd:()=>gameState.breakout.keys.right=false},
+  ]);
+  // Touch move
+  const cv=getCanvas();
+  cv.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    const r=cv.getBoundingClientRect();
+    const tx=(e.touches[0].clientX-r.left)*(cW()/r.width);
+    gameState.breakout.paddle.x=Math.max(0,Math.min(cW()-gameState.breakout.paddle.w,tx-gameState.breakout.paddle.w/2));
+  },{passive:false});
+  document.getElementById('desktopHint').textContent='⌨️ ←/→ or A/D keys · Mouse also works · Clear all bricks to win!';
+  // Mouse
+  cv.addEventListener('mousemove',e=>{
+    if(!gameRunning)return;
+    const r=cv.getBoundingClientRect();
+    const mx=(e.clientX-r.left)*(cW()/r.width);
+    gameState.breakout.paddle.x=Math.max(0,Math.min(cW()-gameState.breakout.paddle.w,mx-gameState.breakout.paddle.w/2));
+  });
+  drawBreakout();
+}
+function updateBreakout(){
+  const b=gameState.breakout,W=cW(),H=cH(),s=5.5;
+  if(b.keys.left)b.paddle.x=Math.max(0,b.paddle.x-s);
+  if(b.keys.right)b.paddle.x=Math.min(W-b.paddle.w,b.paddle.x+s);
+  b.ball.x+=b.ball.vx;b.ball.y+=b.ball.vy;
+  if(b.ball.x-b.ball.r<0){b.ball.x=b.ball.r;b.ball.vx=Math.abs(b.ball.vx);}
+  if(b.ball.x+b.ball.r>W){b.ball.x=W-b.ball.r;b.ball.vx=-Math.abs(b.ball.vx);}
+  if(b.ball.y-b.ball.r<0){b.ball.y=b.ball.r;b.ball.vy=Math.abs(b.ball.vy);}
+  if(b.ball.y+b.ball.r>H){onGameLose(b.score);return;}
+  // Paddle
+  if(b.ball.y+b.ball.r>b.paddle.y&&b.ball.y-b.ball.r<b.paddle.y+b.paddle.h&&b.ball.x>b.paddle.x&&b.ball.x<b.paddle.x+b.paddle.w){
+    b.ball.vy=-Math.abs(b.ball.vy);
+    const rel=(b.ball.x-(b.paddle.x+b.paddle.w/2))/(b.paddle.w/2);
+    b.ball.vx=rel*6;
+  }
+  // Bricks
+  b.bricks.forEach(brick=>{
+    if(!brick.alive)return;
+    if(b.ball.x+b.ball.r>brick.x&&b.ball.x-b.ball.r<brick.x+brick.w&&b.ball.y+b.ball.r>brick.y&&b.ball.y-b.ball.r<brick.y+brick.h){
+      brick.alive=false;b.score+=10;b.ball.vy*=-1;
+      const alive=b.bricks.filter(x=>x.alive).length;
+      setScoreBar([{label:'Bricks',val:alive,color:'#f59e0b'},{label:'Score',val:b.score,color:'#ff3d6e'}]);
+      if(alive===0){onGameWin(b.score);return;}
+    }
+  });
+  drawBreakout();
+}
+function drawBreakout(){
+  const ctx=getCtx();if(!ctx)return;
+  const b=gameState.breakout,W=cW(),H=cH();
+  ctx.fillStyle='#1a2744';ctx.fillRect(0,0,W,H);
+  b.bricks.forEach(brick=>{
+    if(!brick.alive)return;
+    ctx.fillStyle=brick.color;ctx.shadowColor=brick.color;ctx.shadowBlur=8;
+    if(ctx.roundRect){ctx.beginPath();ctx.roundRect(brick.x,brick.y,brick.w,brick.h,4);ctx.fill();}
+    else ctx.fillRect(brick.x,brick.y,brick.w,brick.h);
+  });
+  ctx.shadowBlur=0;
+  // Paddle
+  const pg=ctx.createLinearGradient(b.paddle.x,0,b.paddle.x+b.paddle.w,0);
+  pg.addColorStop(0,'#f59e0b');pg.addColorStop(1,'#ff7a00');
+  ctx.fillStyle=pg;ctx.shadowColor='#f59e0b';ctx.shadowBlur=10;
+  if(ctx.roundRect){ctx.beginPath();ctx.roundRect(b.paddle.x,b.paddle.y,b.paddle.w,b.paddle.h,5);ctx.fill();}
+  else ctx.fillRect(b.paddle.x,b.paddle.y,b.paddle.w,b.paddle.h);
+  // Ball
+  const ballG=ctx.createRadialGradient(b.ball.x-2,b.ball.y-2,1,b.ball.x,b.ball.y,b.ball.r);
+  ballG.addColorStop(0,'#fff9f0');ballG.addColorStop(1,'#0ea5e9');
+  ctx.fillStyle=ballG;ctx.shadowColor='#0ea5e9';ctx.shadowBlur=14;
+  ctx.beginPath();ctx.arc(b.ball.x,b.ball.y,b.ball.r,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;
+}
+
+// ─────────────────── SPACE INVADERS ───────────────────
+function initSpace(){
+  const diff=getDiff('space');
+  const alienRows=diff==='easy'?2:diff==='hard'?4:3;
+  const alienCols=8;
+  const W=cW(),H=cH();
+  const aliens=[];
+  const aw=32,ah=22,padX=20;
+  const totalW=alienCols*aw+(alienCols-1)*6;
+  const startX=(W-totalW)/2;
+  for(let r=0;r<alienRows;r++)for(let c=0;c<alienCols;c++){
+    aliens.push({x:startX+c*(aw+6),y:40+r*36,w:aw,h:ah,alive:true,row:r});
+  }
+  const alienSpeed=diff==='easy'?.4:diff==='hard'?1.1:.7;
+  gameState.space={
+    ship:{x:W/2-18,y:H-50,w:36,h:28},
+    bullets:[],alienBullets:[],
+    aliens,alienDir:1,alienSpeed,alienDropY:20,
+    alienShootTimer:0,alienShootInterval:diff==='easy'?140:diff==='hard'?55:90,
+    score:0,keys:{left:false,right:false,fire:false},
+    touch:{left:false,right:false,fire:false},
+    lastShot:0,shotCooldown:320,
+  };
+  setScoreBar([{label:'Score',val:0,color:'#0ea5e9'},{label:'Aliens',val:aliens.length,color:'#ff3d6e'}]);
+  setupMobileControls([
+    {label:'◀',id:'asl',onStart:()=>gameState.space.touch.left=true,onEnd:()=>gameState.space.touch.left=false},
+    {label:'🔥',id:'asf',onStart:()=>gameState.space.touch.fire=true,onEnd:()=>gameState.space.touch.fire=false},
+    {label:'▶',id:'asr',onStart:()=>gameState.space.touch.right=true,onEnd:()=>gameState.space.touch.right=false},
+  ]);
+  document.getElementById('desktopHint').textContent='⌨️ ←/→ to move · SPACE to shoot · Destroy all aliens!';
+  drawSpace();
+}
+function updateSpace(){
+  const s=gameState.space,W=cW(),H=cH();const spd=5;
+  if(s.keys.left||s.touch.left)s.ship.x=Math.max(0,s.ship.x-spd);
+  if(s.keys.right||s.touch.right)s.ship.x=Math.min(W-s.ship.w,s.ship.x+spd);
+  const now=performance.now();
+  if((s.keys.fire||s.touch.fire)&&now-s.lastShot>s.shotCooldown){
+    s.bullets.push({x:s.ship.x+s.ship.w/2,y:s.ship.y,w:3,h:12,vy:-8});
+    s.lastShot=now;
+  }
+  // Move bullets
+  s.bullets=s.bullets.filter(b=>{b.y+=b.vy;return b.y>0;});
+  s.alienBullets=s.alienBullets.filter(b=>{b.y+=b.vy;return b.y<H;});
+  // Move aliens
+  const alive=s.aliens.filter(a=>a.alive);
+  if(!alive.length){onGameWin(s.score);return;}
+  let hitWall=false;
+  alive.forEach(a=>{a.x+=s.alienSpeed*s.alienDir;});
+  alive.forEach(a=>{if(a.x<=0||a.x+a.w>=W)hitWall=true;});
+  if(hitWall){s.alienDir*=-1;alive.forEach(a=>a.y+=s.alienDropY);}
+  // Alien shoot
+  s.alienShootTimer++;
+  if(s.alienShootTimer>=s.alienShootInterval){
+    s.alienShootTimer=0;
+    const shooters=alive.filter(a=>!alive.some(b=>b.alive&&b!==a&&Math.abs(b.x-a.x)<5&&b.y>a.y));
+    if(shooters.length){
+      const sh=shooters[Math.floor(Math.random()*shooters.length)];
+      s.alienBullets.push({x:sh.x+sh.w/2,y:sh.y+sh.h,w:3,h:10,vy:4+Math.random()*2});
+    }
+  }
+  // Bullet-alien collision
+  s.bullets.forEach(b=>{
+    s.aliens.forEach(a=>{
+      if(a.alive&&b.x>a.x&&b.x<a.x+a.w&&b.y>a.y&&b.y<a.y+a.h){
+        a.alive=false;b.y=-99;s.score+=10;
+        setScoreBar([{label:'Score',val:s.score,color:'#0ea5e9'},{label:'Aliens',val:s.aliens.filter(x=>x.alive).length,color:'#ff3d6e'}]);
+        if(!s.aliens.some(x=>x.alive)){onGameWin(s.score);return;}
+      }
+    });
+  });
+  // Alien bullet hits ship
+  s.alienBullets.forEach(b=>{
+    if(b.x>s.ship.x&&b.x<s.ship.x+s.ship.w&&b.y>s.ship.y&&b.y<s.ship.y+s.ship.h){onGameLose(s.score);return;}
+  });
+  // Aliens reach bottom
+  if(alive.some(a=>a.y+a.h>=s.ship.y)){onGameLose(s.score);return;}
+  drawSpace();
+}
+function drawSpace(){
+  const ctx=getCtx();if(!ctx)return;
+  const s=gameState.space,W=cW(),H=cH();
+  ctx.fillStyle='#0a0f1e';ctx.fillRect(0,0,W,H);
+  // Stars
+  if(!gameState.space._stars){gameState.space._stars=Array.from({length:40},()=>({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.5+.5}));}
+  ctx.fillStyle='rgba(255,255,255,.5)';
+  gameState.space._stars.forEach(st=>{ctx.beginPath();ctx.arc(st.x,st.y,st.r,0,Math.PI*2);ctx.fill();});
+  // Aliens
+  const emos=['👾','🤖','👽'];
+  ctx.font=`${20}px serif`;ctx.textAlign='center';
+  s.aliens.forEach(a=>{
+    if(!a.alive)return;
+    ctx.fillText(emos[a.row%3],a.x+a.w/2,a.y+a.h);
+  });
+  // Ship
+  ctx.fillStyle='#0ea5e9';ctx.shadowColor='#0ea5e9';ctx.shadowBlur=12;
+  ctx.font=`${28}px serif`;ctx.fillText('🚀',s.ship.x+s.ship.w/2-2,s.ship.y+s.ship.h);
+  ctx.shadowBlur=0;
+  // Bullets
+  ctx.fillStyle='#ffd700';ctx.shadowColor='#ffd700';ctx.shadowBlur=8;
+  s.bullets.forEach(b=>{if(ctx.roundRect){ctx.beginPath();ctx.roundRect(b.x-b.w/2,b.y,b.w,b.h,2);ctx.fill();}else ctx.fillRect(b.x-b.w/2,b.y,b.w,b.h);});
+  ctx.fillStyle='#ff4466';ctx.shadowColor='#ff4466';
+  s.alienBullets.forEach(b=>{ctx.fillRect(b.x-b.w/2,b.y,b.w,b.h);});
+  ctx.shadowBlur=0;
+}
+
+// ─────────────────── DINO RUNNER ───────────────────
+function initDino(){
+  const diff=getDiff('dino');
+  const speed=diff==='easy'?4:diff==='hard'?7:5.5;
+  gameState.dino={
+    dino:{x:60,y:0,vy:0,onGround:true,h:36,w:32},
+    obstacles:[],score:0,WIN:20,
+    speed,spawnTimer:0,spawnInterval:diff==='easy'?110:diff==='hard'?60:80,
+    groundY:0,keys:{jump:false},touch:{jump:false},jumped:false,
+  };
+  gameState.dino.groundY=cH()-50;
+  gameState.dino.dino.y=gameState.dino.groundY-gameState.dino.dino.h;
+  setScoreBar([{label:'Score',val:0,color:'#ff7a00'},{label:'Best',val:getBest('dino'),color:'#f59e0b'}]);
+  setupMobileControls([{label:'Jump! 🦕',id:'dj',onStart:()=>dinoJump()}]);
+  document.getElementById('desktopHint').textContent='⌨️ SPACE or ↑ to jump · Survive 20 obstacles to win!';
+  drawDino();
+}
+function dinoJump(){
+  const d=gameState.dino;
+  if(d.dino.onGround){d.dino.vy=-13;d.dino.onGround=false;}
+}
+function updateDino(){
+  const d=gameState.dino,H=cH(),W=cW(),g=0.6;
+  if(d.keys.jump&&d.dino.onGround)dinoJump();
+  d.dino.vy+=g;d.dino.y+=d.dino.vy;
+  if(d.dino.y>=d.groundY-d.dino.h){d.dino.y=d.groundY-d.dino.h;d.dino.vy=0;d.dino.onGround=true;}
+  // Spawn obstacles
+  d.spawnTimer++;
+  if(d.spawnTimer>=d.spawnInterval){
+    d.spawnTimer=0;
+    const h=28+Math.random()*24;
+    d.obstacles.push({x:W+10,y:d.groundY-h,w:20,h,color:'#10b981'});
+  }
+  d.obstacles.forEach(o=>o.x-=d.speed);
+  d.obstacles=d.obstacles.filter(o=>{
+    if(o.x+o.w<0){d.score++;setScoreBar([{label:'Score',val:d.score,color:'#ff7a00'},{label:'Best',val:getBest('dino'),color:'#f59e0b'}]);
+      if(d.score>=d.WIN){onGameWin(d.score);return false;}
+      // Speed up
+      if(d.score%5===0)d.speed=Math.min(d.speed+.5,12);
+    }return true;
+  });
+  // Collision
+  const dx=d.dino.x,dy=d.dino.y,dw=d.dino.w,dh=d.dino.h;
+  for(const o of d.obstacles){
+    if(dx+dw-6>o.x&&dx+6<o.x+o.w&&dy+dh-4>o.y&&dy+4<o.y+o.h){onGameLose(d.score);return;}
+  }
+  drawDino();
+}
+function drawDino(){
+  const ctx=getCtx();if(!ctx)return;
+  const d=gameState.dino,W=cW(),H=cH();
+  // Sky gradient
+  const sky=ctx.createLinearGradient(0,0,0,H);sky.addColorStop(0,'#87ceeb');sky.addColorStop(1,'#e0f0ff');
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+  // Ground
+  ctx.fillStyle='#8b6914';ctx.fillRect(0,d.groundY,W,H-d.groundY);
+  ctx.fillStyle='#a07840';ctx.fillRect(0,d.groundY,W,6);
+  // Clouds
+  if(!gameState.dino._clouds)gameState.dino._clouds=[{x:100,y:40},{x:280,y:25},{x:450,y:50}];
+  gameState.dino._clouds.forEach(c=>{c.x-=.6;if(c.x<-60)c.x=W+40;
+    ctx.fillStyle='rgba(255,255,255,.85)';ctx.beginPath();ctx.arc(c.x,c.y,18,0,Math.PI*2);
+    ctx.arc(c.x+18,c.y-5,14,0,Math.PI*2);ctx.arc(c.x+32,c.y,12,0,Math.PI*2);ctx.fill();});
+  // Obstacles
+  d.obstacles.forEach(o=>{
+    ctx.fillStyle='#059669';ctx.fillRect(o.x,o.y,o.w,o.h);
+    ctx.fillStyle='#34d399';ctx.fillRect(o.x-4,o.y,o.w+8,10);
+  });
+  // Dino
+  ctx.font=`${d.dino.w+4}px serif`;ctx.textAlign='center';
+  ctx.fillText('🦕',d.dino.x+d.dino.w/2,d.dino.y+d.dino.h);
+}
+
+// ═══ MOBILE CONTROLS BUILDER ═══
+function setupMobileControls(row1,row2){
+  const mc=document.getElementById('mobileControls');if(!mc)return;
+  mc.innerHTML='';mc.style.flexDirection='column';mc.style.gap='8px';
+  function makeBtn(item,extraStyle=''){
+    if(!item)return`<div style="flex:1"></div>`;
+    const b=document.createElement('button');
+    b.className='mc-btn';b.textContent=item.label;
+    if(extraStyle)b.style.cssText+=extraStyle;
+    if(item.onStart){
+      b.addEventListener('touchstart',e=>{e.preventDefault();item.onStart();},{passive:false});
+      b.addEventListener('mousedown',e=>{e.preventDefault();item.onStart();});
+    }
+    if(item.onEnd){
+      b.addEventListener('touchend',e=>{e.preventDefault();item.onEnd();},{passive:false});
+      b.addEventListener('mouseup',e=>{e.preventDefault();item.onEnd();});
+    } else {
+      // one-shot
+      b.addEventListener('touchstart',e=>{e.preventDefault();if(item.onStart)item.onStart();},{passive:false});
+    }
+    return b;
+  }
+  if(row1){
+    const r=document.createElement('div');r.style.cssText='display:flex;gap:8px;width:100%';
+    row1.forEach(item=>{
+      if(typeof item==='string'){r.innerHTML+=item;}else{const el=makeBtn(item);if(typeof el==='string')r.innerHTML+=el;else r.appendChild(el);}
+    });
+    mc.appendChild(r);
+  }
+  if(row2){
+    const r=document.createElement('div');r.style.cssText='display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%';
+    row2.forEach(item=>{
+      if(!item){const d=document.createElement('div');r.appendChild(d);}
+      else{const el=makeBtn(item,'');r.appendChild(el);}
+    });
+    mc.appendChild(r);
+  }
+}
+
+// ═══ KEYBOARD EVENTS ═══
+const keys={};
+document.addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  if(['ArrowUp','ArrowDown','Space'].includes(e.code))e.preventDefault();
+  // Route to current game
+  if(!gameRunning)return;
+  if(currentGameId==='pong'){
+    if(e.code==='ArrowUp'||e.code==='KeyW')gameState.pong.keys.up=true;
+    if(e.code==='ArrowDown'||e.code==='KeyS')gameState.pong.keys.down=true;
+  }
+  if(currentGameId==='snake'){
+    const s=gameState.snake;
+    if((e.code==='ArrowUp'||e.code==='KeyW')&&s.dir.y!==1)s.nextDir={x:0,y:-1};
+    if((e.code==='ArrowDown'||e.code==='KeyS')&&s.dir.y!==-1)s.nextDir={x:0,y:1};
+    if((e.code==='ArrowLeft'||e.code==='KeyA')&&s.dir.x!==1)s.nextDir={x:-1,y:0};
+    if((e.code==='ArrowRight'||e.code==='KeyD')&&s.dir.x!==-1)s.nextDir={x:1,y:0};
+  }
+  if(currentGameId==='breakout'){
+    if(e.code==='ArrowLeft'||e.code==='KeyA')gameState.breakout.keys.left=true;
+    if(e.code==='ArrowRight'||e.code==='KeyD')gameState.breakout.keys.right=true;
+  }
+  if(currentGameId==='space'){
+    if(e.code==='ArrowLeft'||e.code==='KeyA')gameState.space.keys.left=true;
+    if(e.code==='ArrowRight'||e.code==='KeyD')gameState.space.keys.right=true;
+    if(e.code==='Space')gameState.space.keys.fire=true;
+  }
+  if(currentGameId==='dino'){
+    if(e.code==='Space'||e.code==='ArrowUp')dinoJump();
+  }
+});
+document.addEventListener('keyup',e=>{
+  keys[e.code]=false;
+  if(!gameRunning)return;
+  if(currentGameId==='pong'){
+    if(e.code==='ArrowUp'||e.code==='KeyW')gameState.pong.keys.up=false;
+    if(e.code==='ArrowDown'||e.code==='KeyS')gameState.pong.keys.down=false;
+  }
+  if(currentGameId==='breakout'){
+    if(e.code==='ArrowLeft'||e.code==='KeyA')gameState.breakout.keys.left=false;
+    if(e.code==='ArrowRight'||e.code==='KeyD')gameState.breakout.keys.right=false;
+  }
+  if(currentGameId==='space'){
+    if(e.code==='ArrowLeft'||e.code==='KeyA')gameState.space.keys.left=false;
+    if(e.code==='ArrowRight'||e.code==='KeyD')gameState.space.keys.right=false;
+    if(e.code==='Space')gameState.space.keys.fire=false;
+  }
+});
+
+function getBest(gameId){
+  const lb=state.leaderboard[gameId]||[];
+  return lb.length?lb[0].score:0;
+}
+
+// ═══ SUPERVISOR ═══
+function renderSignOff(){
+  const cards=state.kids.map(kid=>{
+    const chores=kidChores(kid.id);
+    const checked=chores.filter(c=>getCS(kid.id,c.id).checked&&!getCS(kid.id,c.id).signed&&!getCS(kid.id,c.id).cancelled);
+    const rows=checked.map(c=>`<div class="sign-row"><span>⏳</span><span style="flex:1">${c.name}</span><button class="btn btn-green btn-sm" onclick="signChore(${kid.id},${c.id})">Sign ✓</button></div>`).join('');
+    const tidy=kid.tidyChecked&&!kid.tidySigned?`<div class="sign-row" style="border-top:1px solid var(--border);margin-top:5px;padding-top:5px"><span>🌙</span><span style="flex:1">Tidy area</span><button class="btn btn-gold btn-sm" onclick="signTidy(${kid.id})">+1⭐</button></div>`:'';
+    return`<div class="super-card"><div class="super-card-head"><div class="mini-em" style="background:${KB[kid.id]};color:${KC[kid.id]}">${kid.emoji}</div><div><strong style="color:${KC[kid.id]}">${kid.name}</strong><div style="font-size:.73rem;color:var(--muted)">${kid.points} pts ${kid.approvedAt?'· ✅ FREE TIME':''}</div></div></div>${rows||'<div style="color:var(--muted);font-size:.8rem">Nothing to sign yet</div>'}${tidy}</div>`;
+  }).join('');
+  return`<h2 class="fredoka" style="margin-bottom:14px">👁️ Sign-Off</h2><div class="super-grid">${cards}</div>`;
+}
+
+// ═══ PARENT ═══
+function renderParentOverview(){
+  return`<h2 class="fredoka" style="margin-bottom:14px">📊 Overview</h2>`+state.kids.map(kid=>{
+    const chores=kidChores(kid.id),signed=chores.filter(c=>getCS(kid.id,c.id).signed).length;
+    return`<div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-color:${KBD[kid.id]}">
+      <div style="font-size:1.9rem">${kid.emoji}</div>
+      <div style="flex:1"><div style="font-weight:800;color:${KC[kid.id]}">${kid.name}</div>
+        <div style="font-size:.78rem;color:var(--muted);font-weight:700">${signed}/${chores.length} signed · Bedtime ${kid.bedtime}</div>
+        <div class="progress-track" style="margin-top:5px"><div class="progress-fill" style="width:${chores.length?signed/chores.length*100:100}%;background:${KC[kid.id]}"></div></div></div>
+      <div style="font-family:'Fredoka One',cursive;font-size:1.7rem;color:${KC[kid.id]}">${kid.points} ⭐</div>
+      ${kid.approvedAt?'<span class="badge badge-signed">✅ Free</span>':''}
+    </div>`;}).join('');
+}
+function renderParentKid(kidId){
+  const kid=getKid(kidId),chores=kidChores(kidId);
+  const rows=chores.map(c=>{
+    const cs=getCS(kidId,c.id);
+    return`<div class="sign-row"><span>${cs.cancelled?'🚫':cs.signed?'✅':cs.checked?'⏳':'◻️'}</span><span style="flex:1">${c.name}</span>
+      <div style="display:flex;gap:4px">
+        ${!cs.signed&&!cs.cancelled&&cs.checked?`<button class="btn btn-green btn-sm" onclick="signChore(${kidId},${c.id})">Sign</button>`:''}
+        <button class="btn ${cs.cancelled?'btn-outline':'btn-red'} btn-sm" onclick="cancelChore(${kidId},${c.id})">${cs.cancelled?'Restore':'Cancel'}</button>
+      </div></div>`;}).join('');
+  const i=kidId<KC.length?kidId:0;
+  return`<div class="card" style="margin-bottom:10px;border-color:${KBD[i]}">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div class="parent-avatar-circle" style="width:52px;height:52px;font-size:1.8rem;border-color:${KC[i]}" onclick="openProfileEdit('kid',${kidId})">${kid.emoji}<div style="position:absolute;inset:0;background:rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;opacity:0;border-radius:50%;font-size:.7rem;color:white;font-weight:800;transition:.18s" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0">✏️</div></div>
+      <div style="flex:1">
+        <div style="font-family:'Fredoka One',cursive;font-size:1.25rem;color:${KC[i]}">${kid.name}</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+          <span style="font-size:.78rem;color:var(--muted);font-weight:700">🌙 Bedtime:</span>
+          <input type="time" value="${kid.bedtime}" onchange="setBedtime(${kidId},this.value)" style="font-size:.82rem;padding:3px 7px;border-radius:8px;border:2px solid var(--border);background:var(--surface2);color:var(--text)">
+        </div>
+      </div>
+      <div style="font-family:'Fredoka One',cursive;font-size:1.8rem;color:${KC[i]}">${kid.points} ⭐</div></div>
+    <div style="display:flex;gap:7px;margin-top:10px;flex-wrap:wrap">
+      ${!kid.loggedInAt?`<button class="btn btn-green btn-sm" onclick="loginKid(${kidId})">Log Home</button>`:`<span class="badge badge-signed">🏠 Home</span>`}
+      <button class="btn btn-gold btn-sm" onclick="giveBonus(${kidId})">⭐ Bonus +1</button>
+      ${kid.approvedAt?'<span class="badge badge-signed">✅ Free</span>':''}
+    </div></div>
+  <div class="section-head">📋 Chores</div>
+  <div class="card">${rows||'<div style="color:var(--muted)">No chores today</div>'}</div>
+  <div class="section-head">📜 Points</div>
+  <div class="pts-log card">${kid.pointLog.slice(0,10).map(e=>`<div class="pts-row"><span style="color:var(--muted)">${e.time} — ${e.reason}</span><span class="${e.amount>0?'pts-pos':'pts-neg'}">${e.amount>0?'+':''}${e.amount}</span></div>`).join('')||'<div style="color:var(--muted);font-size:.8rem;padding:6px">No points yet</div>'}</div>`;
+}
+
+// ═══ REWARDS ═══
+function renderRewards(isParent=false){
+  const kidId=session.type==='kid'?session.id:null;
+  const kid=kidId!==null?getKid(kidId):null;
+  const pendingCount=(state.rewardRequests||[]).filter(r=>r.status==='pending').length;
+  const cards=state.rewards.map(r=>{
+    const editBtns=isParent?`<div style="display:flex;gap:5px;margin-bottom:7px"><button class="btn btn-outline btn-sm" onclick="editReward(${r.id})">✏️</button><button class="btn btn-red btn-sm" onclick="deleteReward(${r.id})">🗑️</button></div>`:'';
+    if(isParent){
+      const kidBtns=state.kids.map((k,i)=>`<button class="rw-kid-btn" style="background:${KB[i]};color:${KC[i]};border-color:${KC[i]}" onclick="redeemReward(${k.id},${r.id})">${k.emoji} ${k.points}⭐</button>`).join('');
+      return`<div class="reward-card">${editBtns}<div class="rw-icon">${r.icon}</div><div class="rw-name">${r.name}</div><div class="rw-cost">${r.cost} ⭐</div><div class="rw-desc">${r.desc}</div><div style="font-size:.7rem;color:var(--muted);margin-bottom:5px">Redeem for:</div><div class="rw-kids">${kidBtns}</div></div>`;
+    } else {
+      // Kid view — show request button
+      const myReq=(state.rewardRequests||[]).find(x=>x.kidId===kidId&&x.rewardId===r.id&&x.status==='pending');
+      const canAfford=kid&&kid.points>=r.cost;
+      let actionBtn='';
+      if(myReq){
+        actionBtn=`<div class="req-badge req-pending" style="margin-top:8px;display:flex;gap:6px;align-items:center">⏳ Awaiting approval <button onclick="cancelRewardRequest('${myReq.id}')" style="background:none;border:none;cursor:pointer;font-size:.9rem;margin-left:4px">✕</button></div>`;
+      } else if(canAfford){
+        actionBtn=`<button class="btn btn-gold btn-sm" style="margin-top:8px;width:100%" onclick="requestReward(${r.id})">🎁 Request (${r.cost} ⭐)</button>`;
+      } else {
+        actionBtn=`<div style="margin-top:8px;font-size:.75rem;color:var(--muted);font-weight:700">Need ${r.cost-kid.points} more ⭐</div>`;
+      }
+      return`<div class="reward-card">${editBtns}<div class="rw-icon">${r.icon}</div><div class="rw-name">${r.name}</div><div class="rw-cost">${r.cost} ⭐</div><div class="rw-desc">${r.desc}</div>${actionBtn}</div>`;
+    }
+  }).join('');
+  const addBtn=isParent?`<button class="btn btn-primary" style="margin-bottom:14px" onclick="openAddReward()">➕ Add Reward</button>`:'';
+  const approvalBtn=isParent&&pendingCount>0?`<button class="btn btn-orange" style="margin-bottom:14px;margin-left:8px" onclick="openRewardApprovals()">🎁 ${pendingCount} Request${pendingCount>1?'s':''} Pending</button>`:'';
+  return`<h2 class="fredoka" style="margin-bottom:10px">🎁 Rewards Store</h2><div style="margin-bottom:4px">${addBtn}${approvalBtn}</div><div class="rewards-grid">${cards}</div>`;
+}
+
+function requestReward(rewardId){
+  const kid=getKid(session.id);const r=state.rewards.find(x=>x.id===rewardId);
+  if(!r||!kid)return;
+  if(kid.points<r.cost){notify(`Need ${r.cost} ⭐ to request`,'#ef4444');return;}
+  if(!state.rewardRequests)state.rewardRequests=[];
+  // Check no duplicate pending
+  if(state.rewardRequests.find(x=>x.kidId===kid.id&&x.rewardId===rewardId&&x.status==='pending')){notify('Already requested!','#f59e0b');return;}
+  state.rewardRequests.push({id:`req_${Date.now()}`,kidId:kid.id,rewardId,status:'pending',time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+  notify(`${kid.emoji} Reward requested! Waiting for parent approval 🙏`,'#7c3aed');
+  renderTab(session.type,session.id);saveState();
+}
+function cancelRewardRequest(reqId){
+  if(!state.rewardRequests)return;
+  state.rewardRequests=state.rewardRequests.filter(r=>r.id!==reqId);
+  renderTab(session.type,session.id);notify('Request cancelled');
+}
+function openRewardApprovals(){
+  if(!state.rewardRequests)state.rewardRequests=[];
+  const pending=state.rewardRequests.filter(r=>r.status==='pending');
+  const list=document.getElementById('rewardApprovalList');
+  if(!pending.length){list.innerHTML='<div style="color:var(--muted);text-align:center;padding:16px;font-weight:700">No pending requests 🎉</div>';openModal('rewardApprovalModal');return;}
+  list.innerHTML=pending.map(req=>{
+    const kid=getKid(req.kidId);const reward=state.rewards.find(r=>r.id===req.rewardId);
+    if(!kid||!reward)return'';
+    const i=kid.id<KC.length?kid.id:0;
+    return`<div class="req-list-item">
+      <div style="font-size:1.6rem">${reward.icon}</div>
+      <div style="flex:1">
+        <div style="font-weight:800">${kid.emoji} ${kid.name} wants <strong>${reward.name}</strong></div>
+        <div style="font-size:.75rem;color:var(--muted)">${reward.cost} ⭐ · Requested ${req.time} · ${kid.points} ⭐ available</div>
+      </div>
+      <div style="display:flex;gap:5px">
+        <button class="btn btn-green btn-sm" onclick="approveRewardRequest('${req.id}')">✓ Approve</button>
+        <button class="btn btn-red btn-sm" onclick="denyRewardRequest('${req.id}')">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+  openModal('rewardApprovalModal');
+}
+function approveRewardRequest(reqId){
+  const req=state.rewardRequests.find(r=>r.id===reqId);if(!req)return;
+  const kid=getKid(req.kidId);const reward=state.rewards.find(r=>r.id===req.rewardId);
+  if(!kid||!reward)return;
+  if(kid.points<reward.cost){notify(`${kid.name} doesn't have enough points!`,'#ef4444');req.status='denied';openRewardApprovals();return;}
+  kid.points-=reward.cost;
+  kid.pointLog.unshift({amount:-reward.cost,reason:`🎁 Redeemed: ${reward.name}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+  req.status='approved';confetti();
+  notify(`🎉 Approved! ${kid.emoji} ${kid.name} redeemed "${reward.name}"!`,'#f59e0b');
+  openRewardApprovals();renderTab(session.type,session.id);saveState();
+}
+function denyRewardRequest(reqId){
+  const req=state.rewardRequests.find(r=>r.id===reqId);if(req)req.status='denied';
+  openRewardApprovals();renderTab(session.type,session.id);saveState();notify('Request denied');
+}
+
+// ═══ SETTINGS ═══
+function renderSettings(){
+  const c=document.getElementById('tabContent');
+  const kidCards=state.kids.map((k,i)=>`
+    <div class="profile-list-item" style="border-color:${KBD[i]}">
+      <div class="parent-avatar-circle" style="width:44px;height:44px;font-size:1.5rem;border-color:${KC[i]};flex-shrink:0;cursor:pointer" onclick="openProfileEdit('kid',${k.id})">${k.emoji}</div>
+      <div class="info"><div class="name" style="color:${KC[i]}">${k.name}</div><div class="sub">PIN: ${k.pin} · Bed: ${k.bedtime}</div></div>
+      <button class="btn btn-outline btn-sm" onclick="openProfileEdit('kid',${k.id})">✏️ Edit</button>
+    </div>`).join('');
+  const supCards=state.supervisors.map(s=>`
+    <div class="profile-list-item">
+      <div class="parent-avatar-circle" style="width:44px;height:44px;font-size:1.5rem;flex-shrink:0;cursor:pointer" onclick="openProfileEdit('supervisor','${s.id}')">${s.emoji}</div>
+      <div class="info"><div class="name">${s.name}</div><div class="sub">PIN: ${s.pin}</div></div>
+      <button class="btn btn-outline btn-sm" onclick="openProfileEdit('supervisor','${s.id}')">✏️</button>
+    </div>`).join('');
+  const parCards=state.parents.map(p=>`
+    <div class="profile-list-item">
+      <div class="parent-avatar-circle" style="width:44px;height:44px;font-size:1.5rem;border-color:#f59e0b;flex-shrink:0;cursor:pointer" onclick="openProfileEdit('parent','${p.id}')">${p.emoji}</div>
+      <div class="info"><div class="name">${p.name}</div><div class="sub">PIN: ${p.pin}</div></div>
+      <button class="btn btn-outline btn-sm" onclick="openProfileEdit('parent','${p.id}')">✏️</button>
+    </div>`).join('');
+  const choreList=state.chores.map(cc=>{
+    const em=cc.kids.map(ki=>getKid(ki)?.emoji||'?').join(' ');
+    return`<div class="chore-edit-row"><div class="name">${cc.name}<div style="font-size:.7rem;color:var(--muted)">${em} · ${cc.days.length?cc.days.join('·'):'Every day'}</div></div><button class="btn btn-outline btn-sm" onclick="editChoreOpen(${cc.id})">✏️</button><button class="btn btn-red btn-sm" onclick="deleteChore(${cc.id})">🗑️</button></div>`;}).join('');
+  const diffRows=GAME_DEFS.map(g=>`<div class="bedtime-row"><div style="font-size:1.5rem">${g.icon}</div><div style="flex:1"><div style="font-weight:800">${g.name}</div><div style="font-size:.72rem;color:var(--muted)">${g.desc}</div></div><select class="diff-sel" onchange="setDifficulty('${g.id}',this.value)"><option value="easy"${getDiff(g.id)==='easy'?' selected':''}>😊 Easy</option><option value="medium"${getDiff(g.id)==='medium'?' selected':''}>😤 Medium</option><option value="hard"${getDiff(g.id)==='hard'?' selected':''}>💀 Hard</option></select></div>`).join('');
+  c.innerHTML=`<div class="settings-grid">
+    <div class="setting-card"><h3>👦 Kid Profiles</h3>${kidCards}<button class="btn btn-primary btn-sm" style="margin-top:9px" onclick="addKidProfile()">➕ Add Kid</button></div>
+    <div class="setting-card"><h3>👁️ Supervisors</h3>${supCards}<button class="btn btn-outline btn-sm" style="margin-top:7px" onclick="addStaffProfile('supervisor')">➕ Supervisor</button><h3 style="margin-top:14px">👑 Parents</h3>${parCards}<button class="btn btn-outline btn-sm" style="margin-top:7px" onclick="addStaffProfile('parent')">➕ Parent</button></div>
+    <div class="setting-card"><h3>📋 Chores</h3>${choreList}<button class="btn btn-primary btn-sm" style="margin-top:9px" onclick="addChoreOpen()">➕ Add Chore</button></div>
+    <div class="setting-card" style="grid-column:1/-1"><h3>🎮 Game Difficulty</h3><p style="font-size:.8rem;color:var(--muted);margin-bottom:12px;font-weight:700">Set per-game difficulty.</p>${diffRows}<button class="btn btn-red btn-sm" style="margin-top:12px" onclick="clearLeaderboard()">🗑️ Clear All Scores</button></div>
+  </div>`;
+}
+
+function setDifficulty(gameId,val){state.gameDifficulty[gameId]=val;saveState();notify(`${GAME_DEFS.find(g=>g.id===gameId).icon} Difficulty set to ${val}!`,'#7c3aed');}
+function clearLeaderboard(){if(confirm('Clear all high scores?')){GAME_DEFS.forEach(g=>state.leaderboard[g.id]=[]);renderTab(session.type,session.id);saveState();notify('🗑️ Scores cleared');}}
+
+// ═══ ACTIONS ═══
+function loginKid(id){const k=getKid(id);k.loggedInAt=new Date();k.homeTime=new Date();notify(`${k.emoji} ${k.name} is home! ⏱️`,'#ff7a00');renderTab(session.type,session.id);saveState();}
+function toggleChore(kidId,choreId){const cs=getCS(kidId,choreId);if(cs.cancelled||cs.signed)return;if(!getKid(kidId).loggedInAt)return;setCS(kidId,choreId,{checked:!cs.checked,checkedAt:!cs.checked?new Date():null});renderTab(session.type,session.id);saveState();}
+function toggleTidy(kidId){const k=getKid(kidId);if(k.tidySigned)return;k.tidyChecked=!k.tidyChecked;renderTab(session.type,session.id);saveState();}
+function signChore(kidId,choreId){setCS(kidId,choreId,{signed:true});checkAllSigned(kidId);notify('✅ Signed!','#10b981');renderTab(session.type,session.id);saveState();}
+function signTidy(kidId){const k=getKid(kidId);if(!k.tidyChecked)return;k.tidySigned=true;addPoints(kidId,1,'🧹 Tidied up before bed');renderTab(session.type,session.id);saveState();}
+function cancelChore(kidId,choreId){const cs=getCS(kidId,choreId);setCS(kidId,choreId,{cancelled:!cs.cancelled});renderTab(session.type,session.id);saveState();}
+function giveBonus(kidId){addPoints(kidId,1,'⭐ Bonus from parent');renderTab(session.type,session.id);saveState();}
+function checkAllSigned(kidId){
+  const k=getKid(kidId);
+  if(allSigned(kidId)&&!k.approvedAt){
+    k.approvedAt=new Date();
+    const mins=k.homeTime?Math.floor((k.approvedAt-k.homeTime)/60000):999;
+    if(mins<=60)addPoints(kidId,2,'🏆 Done in 1hr!');
+    else if(mins<=120)addPoints(kidId,1,'👍 Done in 2hrs');
+    confetti();notify(`🎉 ${k.name} APPROVED for FREE TIME!`,'#10b981');
+  }
+}
+function addPoints(kidId,amount,reason){
+  const k=getKid(kidId);
+  k.points=Math.max(0,k.points+amount);
+  k.pointLog.unshift({amount,reason,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+  if(amount>0)notify(`${k.emoji} ${k.name} +${amount} ⭐`,'#f59e0b');
+}
+function redeemReward(kidId,rewardId){
+  const k=getKid(kidId),r=state.rewards.find(x=>x.id===rewardId);if(!r)return;
+  if(k.points<r.cost){notify(`❌ Need ${r.cost} pts`,'#ef4444');return;}
+  k.points-=r.cost;k.pointLog.unshift({amount:-r.cost,reason:`🎁 ${r.name}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+  confetti();notify(`🎉 ${k.emoji} ${k.name} redeemed "${r.name}"!`,'#f59e0b');renderTab(session.type,session.id);
+}
+
+// ═══ REWARD MODAL ═══
+function openAddReward(){
+  editingRewardId=null;
+  document.getElementById('rewardModalTitle').textContent='➕ Add Reward';
+  document.getElementById('rw-icon-preview').textContent='🎁';
+  document.getElementById('rw-icon-val').value='🎁';
+  ['rw-name-in','rw-cost-in','rw-desc-in'].forEach(id=>document.getElementById(id).value='');
+  openModal('rewardModal');
+}
+function editReward(id){
+  editingRewardId=id;const r=state.rewards.find(x=>x.id===id);
+  document.getElementById('rewardModalTitle').textContent='✏️ Edit Reward';
+  document.getElementById('rw-icon-preview').textContent=r.icon;
+  document.getElementById('rw-icon-val').value=r.icon;
+  document.getElementById('rw-name-in').value=r.name;
+  document.getElementById('rw-cost-in').value=r.cost;
+  document.getElementById('rw-desc-in').value=r.desc;
+  openModal('rewardModal');
+}
+function saveReward(){
+  const icon=document.getElementById('rw-icon-val').value.trim()||'🎁';
+  const name=document.getElementById('rw-name-in').value.trim();
+  const cost=parseInt(document.getElementById('rw-cost-in').value)||5;
+  const desc=document.getElementById('rw-desc-in').value.trim();
+  if(!name){notify('Enter a name!','#ef4444');return;}
+  if(editingRewardId!==null)Object.assign(state.rewards.find(x=>x.id===editingRewardId),{icon,name,cost,desc});
+  else state.rewards.push({id:state.nextRewardId++,icon,name,cost,desc});
+  closeModal('rewardModal');renderTab(session.type,session.id);saveState();notify('✅ Saved!');
+}
+function deleteReward(id){state.rewards=state.rewards.filter(r=>r.id!==id);renderTab(session.type,session.id);saveState();}
+
+// ═══ CHORE MODAL ═══
+function addChoreOpen(){editingChoreId=null;document.getElementById('choreModalTitle').textContent='➕ Add Chore';document.getElementById('ch-name-in').value='';buildChoreKidRow(state.kids.map(k=>k.id));document.querySelectorAll('#ch-days-row .day-tag').forEach(t=>t.classList.remove('on'));openModal('choreModal');}
+function editChoreOpen(id){editingChoreId=id;const c=state.chores.find(x=>x.id===id);document.getElementById('choreModalTitle').textContent='✏️ Edit Chore';document.getElementById('ch-name-in').value=c.name;buildChoreKidRow(c.kids);document.querySelectorAll('#ch-days-row .day-tag').forEach(t=>t.classList.toggle('on',c.days.includes(t.dataset.day)));openModal('choreModal');}
+function buildChoreKidRow(sel){document.getElementById('ch-kids-row').innerHTML=state.kids.map((k,i)=>`<button class="btn btn-sm ${sel.includes(k.id)?'btn-primary':'btn-outline'}" style="${sel.includes(k.id)?`background:${KB[i]};color:${KC[i]};border-color:${KC[i]}`:''}" data-kid="${k.id}" onclick="toggleChoreKid(${k.id},this)">${k.emoji} ${k.name}</button>`).join('');}
+function toggleChoreKid(id,btn){btn.classList.toggle('btn-primary');btn.classList.toggle('btn-outline');}
+function saveChore(){
+  const name=document.getElementById('ch-name-in').value.trim();if(!name){notify('Enter a name!','#ef4444');return;}
+  const kids=[...document.querySelectorAll('#ch-kids-row [data-kid]')].filter(b=>b.classList.contains('btn-primary')).map(b=>parseInt(b.dataset.kid));
+  const days=[...document.querySelectorAll('#ch-days-row .day-tag.on')].map(t=>t.dataset.day);
+  if(!kids.length){notify('Select a kid!','#ef4444');return;}
+  if(editingChoreId!==null)Object.assign(state.chores.find(x=>x.id===editingChoreId),{name,kids,days});
+  else state.chores.push({id:state.nextChoreId++,name,kids,days});
+  closeModal('choreModal');renderTab(session.type,session.id);saveState();notify('✅ Saved!');
+}
+function deleteChore(id){state.chores=state.chores.filter(c=>c.id!==id);renderTab(session.type,session.id);saveState();}
+document.addEventListener('click',e=>{if(e.target.classList.contains('day-tag'))e.target.classList.toggle('on');});
+
+// ═══ PROFILE EDIT MODAL (unified) ═══
+let _peTarget={type:null,id:null};
+function openProfileEdit(type,id){
+  _peTarget={type,id};
+  let profile;
+  if(type==='kid')profile=getKid(id);
+  else if(type==='supervisor')profile=state.supervisors.find(s=>s.id===id);
+  else profile=state.parents.find(p=>p.id===id);
+  if(!profile)return;
+  document.getElementById('peTitle').textContent=`✏️ Edit ${type==='kid'?'Kid':'Staff'} Profile`;
+  document.getElementById('pe-emoji').value=profile.emoji||'👤';
+  document.getElementById('peAvatarPreview').textContent=profile.emoji||'👤';
+  document.getElementById('pe-name').value=profile.name||'';
+  document.getElementById('pe-pin').value=profile.pin||'';
+  const bedWrap=document.getElementById('pe-bedtime-wrap');
+  if(type==='kid'){
+    bedWrap.style.display='block';
+    document.getElementById('pe-bedtime').value=profile.bedtime||'20:00';
+  } else {
+    bedWrap.style.display='none';
+  }
+  openModal('profileEditModal');
+}
+function saveProfileEdit(){
+  const{type,id}=_peTarget;
+  const emoji=document.getElementById('pe-emoji').value.trim()||'👤';
+  const name=document.getElementById('pe-name').value.trim();
+  const pin=document.getElementById('pe-pin').value.trim();
+  if(!name){notify('Enter a name!','#ef4444');return;}
+  if(pin&&pin.length!==4){notify('PIN must be exactly 4 digits!','#ef4444');return;}
+  let profile;
+  if(type==='kid'){profile=getKid(id);if(pin)profile.pin=pin;profile.bedtime=document.getElementById('pe-bedtime').value||profile.bedtime;}
+  else if(type==='supervisor')profile=state.supervisors.find(s=>s.id===id);
+  else profile=state.parents.find(p=>p.id===id);
+  if(!profile)return;
+  profile.emoji=emoji;profile.name=name;
+  if(pin&&type!=='kid')profile.pin=pin;
+  // Update home screen if this is the current session user
+  if(session.id===id){
+    document.getElementById('userEm').textContent=emoji;
+    document.getElementById('userName').textContent=name;
+  }
+  closeModal('profileEditModal');
+  renderTab(session.type,session.id);
+  renderHome();
+  saveState();
+  notify(`✅ ${name} updated!`);
+}
+function addKidProfile(){
+  const name=prompt('Kid name:');if(!name)return;
+  const pin=prompt('4-digit PIN:','0000');
+  const emoji=prompt('Emoji (or use settings to change with picker):','⭐');
+  const id=Math.max(...state.kids.map(k=>k.id),-1)+1;
+  state.kids.push({id,name,emoji:emoji||'⭐',pin:pin||'0000',bedtime:'20:00',points:0,pointLog:[],loggedInAt:null,approvedAt:null,homeTime:null,tidyChecked:false,tidySigned:false});
+  renderTab(session.type,session.id);renderHome();saveState();notify(`✅ ${name} added!`);
+}
+function addStaffProfile(type){
+  const name=prompt(`${type==='supervisor'?'Supervisor':'Parent'} name:`);if(!name)return;
+  const pin=prompt('PIN:',type==='supervisor'?'5678':'1234');
+  const emoji=prompt('Emoji:',type==='supervisor'?'👁️':'👑');
+  const id=`${type[0]}${Date.now()}`;
+  const obj={id,name,emoji:emoji||'👤',pin:pin||'0000',role:type};
+  if(type==='supervisor')state.supervisors.push(obj);else state.parents.push(obj);
+  renderTab(session.type,session.id);renderHome();saveState();notify(`✅ ${name} added!`);
+}
+function setBedtime(kidId,val){getKid(kidId).bedtime=val;notify('🌙 Bedtime updated!','#7c3aed');}
+function openSettings(){if(session.type!=='parent'){notify('Parent login required!','#ef4444');return;}activeTab='settings';document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));renderTab(session.type,session.id);}
+
+// ═══ EMOJI PICKER ═══
+const EMOJI_SET=[
+  {section:'Kids & People',emojis:['👦','👧','🧒','👶','🧑','👱','🧔','👨‍👩‍👦','🦅','🐉','🔥','⚡','🌟','💫','✨','🌈']},
+  {section:'Animals',emojis:['🐍','🦁','🐯','🦊','🐺','🐻','🐼','🐨','🦋','🦄','🐬','🦅','🐸','🐙','🦖','🐉']},
+  {section:'Food & Fun',emojis:['🍕','🍦','🎮','🎯','🏆','⭐','💎','🎵','🎨','🎭','🎪','🎠','🏅','🎖️','🥇','🎁']},
+  {section:'Symbols',emojis:['❤️','💛','💚','💙','💜','🧡','🖤','🤍','💪','👑','🔮','💥','🌙','☀️','🌊','🍀']},
+  {section:'Staff & Admin',emojis:['👁️','👑','🦸','🦹','🧙','🧝','🧛','👮','🕵️','🧑‍⚕️','🧑‍🏫','🧑‍✈️','🧑‍🔬','🧑‍💼','⚙️','🔑']},
+];
+let _emojiTargetId=null;
+
+function openEmojiPicker(targetId){
+  _emojiTargetId=targetId;
+  document.getElementById('emojiSearch').value='';
+  renderEmojiGrid('');
+  openModal('emojiModal');
+}
+function renderEmojiGrid(filter){
+  const grid=document.getElementById('emojiGrid');
+  const current=document.getElementById(_emojiTargetId)?.value||'';
+  let html='';
+  EMOJI_SET.forEach(sec=>{
+    const filtered=sec.emojis.filter(e=>!filter||e.includes(filter));
+    if(!filtered.length)return;
+    html+=`<div class="ep-section" style="grid-column:1/-1">${sec.section}</div>`;
+    filtered.forEach(e=>{html+=`<button class="ep-btn${e===current?' selected':''}" onclick="selectEmoji('${e}')">${e}</button>`;});
+  });
+  grid.innerHTML=html||'<div style="grid-column:1/-1;color:var(--muted);font-size:.85rem;padding:10px">No emojis found — use custom field below</div>';
+}
+function filterEmojis(val){renderEmojiGrid(val);}
+function selectEmoji(e){
+  if(!_emojiTargetId)return;
+  document.getElementById(_emojiTargetId).value=e;
+  // Update preview if it's the profile edit modal
+  if(_emojiTargetId==='pe-emoji') document.getElementById('peAvatarPreview').textContent=e;
+  if(_emojiTargetId==='rw-icon-val'&&document.getElementById('rw-icon-preview')) document.getElementById('rw-icon-preview').textContent=e;
+  closeModal('emojiModal');
+}
+function pickCustomEmoji(){
+  const val=document.getElementById('emojiCustom').value.trim();
+  if(val)selectEmoji(val);
+}
+
+// ═══ MODALS ═══
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+document.querySelectorAll('.modal-overlay').forEach(m=>{m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');});});
+
+// ═══ LOCALSTORAGE PERSISTENCE ═══
+const SAVE_KEY='choreChampions_v5';
+function saveState(){
+  try{
+    // Only save serializable data — strip Date objects, convert to timestamps
+    const s=JSON.parse(JSON.stringify(state,(_k,v)=>v instanceof Date?v.toISOString():v));
+    localStorage.setItem(SAVE_KEY,JSON.stringify(s));
+  }catch(e){console.warn('Save failed',e);}
+}
+function loadState(){
+  try{
+    const raw=localStorage.getItem(SAVE_KEY);
+    if(!raw)return;
+    const saved=JSON.parse(raw);
+    // Restore Date fields
+    const dateFields=['loggedInAt','approvedAt','homeTime'];
+    if(saved.kids){
+      saved.kids.forEach(k=>{
+        dateFields.forEach(f=>{if(k[f])k[f]=new Date(k[f]);});
+        // Ensure new fields exist
+        if(!k.pointLog)k.pointLog=[];
+        if(k.tidyChecked===undefined)k.tidyChecked=false;
+        if(k.tidySigned===undefined)k.tidySigned=false;
+      });
+    }
+    // Merge saved into state (keep structure, update values)
+    Object.assign(state,saved);
+    // Re-hydrate any choreState date fields
+    if(state.choreState){
+      Object.values(state.choreState).forEach(cs=>{
+        if(cs.checkedAt)cs.checkedAt=new Date(cs.checkedAt);
+      });
+    }
+    if(!state.rewardRequests)state.rewardRequests=[];
+    if(!state.gameDifficulty)state.gameDifficulty={pong:'medium',snake:'medium',breakout:'medium',space:'medium',dino:'medium'};
+    if(!state.leaderboard)state.leaderboard={pong:[],snake:[],breakout:[],space:[],dino:[]};
+  }catch(e){console.warn('Load failed',e);}
+}
+
+// Auto-save whenever state changes — wrap key mutating functions
+const _origAddPoints=addPoints;
+function addPoints(kidId,amount,reason){_origAddPoints(kidId,amount,reason);saveState();}
+const _origSetCS=setCS;
+// Patch all state mutations to auto-save
+function patchSave(){
+  // We'll use a lightweight proxy approach via periodic save + event-driven saves
+  // Save on any tab switch, modal close, and key actions
+}
+// Save on visibility change (phone locks / switches apps)
+document.addEventListener('visibilitychange',()=>{if(document.hidden)saveState();});
+// Save every 30 seconds as a backstop
+setInterval(saveState, 30000);
+
+// ═══ INSTALL PROMPT ═══
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();deferredPrompt=e;
+  showInstallBanner();
+});
+function showInstallBanner(){
+  // Only show once per session
+  if(sessionStorage.getItem('installDismissed'))return;
+  const banner=document.createElement('div');
+  banner.id='installBanner';
+  banner.style.cssText=`position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#ff7a00,#f59e0b);
+    color:white;padding:14px 18px;display:flex;align-items:center;gap:10px;z-index:2000;
+    font-family:'Nunito',sans-serif;font-weight:800;font-size:.9rem;
+    box-shadow:0 -4px 20px rgba(0,0,0,.15);`;
+  banner.innerHTML=`<span style="font-size:1.4rem">📲</span>
+    <div style="flex:1"><div>Add to Home Screen!</div><div style="font-size:.75rem;font-weight:600;opacity:.9">Install as an app for the best experience</div></div>
+    <button onclick="installPWA()" style="background:white;color:#ff7a00;border:none;border-radius:10px;padding:8px 14px;font-weight:800;font-size:.85rem;cursor:pointer;font-family:'Nunito',sans-serif">Install</button>
+    <button onclick="dismissInstall()" style="background:rgba(255,255,255,.2);border:none;border-radius:8px;padding:8px 10px;color:white;cursor:pointer;font-size:1rem">✕</button>`;
+  document.body.appendChild(banner);
+}
+function installPWA(){
+  if(!deferredPrompt)return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(r=>{
+    if(r.outcome==='accepted')notify('🎉 App installed! Find it on your home screen.','#10b981');
+    deferredPrompt=null;dismissInstall();
+  });
+}
+function dismissInstall(){
+  sessionStorage.setItem('installDismissed','1');
+  const b=document.getElementById('installBanner');if(b)b.remove();
+}
+// iOS Safari hint (no beforeinstallprompt support)
+function showIOSHint(){
+  const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent);
+  const isStandalone=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone;
+  if(!isIOS||isStandalone||sessionStorage.getItem('installDismissed'))return;
+  setTimeout(()=>{
+    const banner=document.createElement('div');
+    banner.style.cssText=`position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#7c3aed,#6d28d9);
+      color:white;padding:14px 18px;z-index:2000;font-family:'Nunito',sans-serif;font-weight:700;font-size:.85rem;
+      box-shadow:0 -4px 20px rgba(0,0,0,.15);text-align:center;`;
+    banner.innerHTML=`<div style="font-size:1.2rem;margin-bottom:4px">📲 Install as iPhone App</div>
+      <div style="opacity:.9">Tap <strong>Share</strong> <span style="font-size:1rem">⬆️</span> then <strong>"Add to Home Screen"</strong></div>
+      <button onclick="this.parentElement.remove();sessionStorage.setItem('installDismissed','1')" 
+        style="margin-top:10px;background:rgba(255,255,255,.2);border:none;border-radius:8px;padding:6px 16px;color:white;cursor:pointer;font-family:'Nunito',sans-serif;font-weight:700">Got it!</button>`;
+    document.body.appendChild(banner);
+  },2500);
+}
+
+// ═══ INIT ═══
+loadState();  // Load saved data first
+renderHome();
+showIOSHint();
+setInterval(()=>{if(session.type==='kid'&&activeTab==='chores')renderTab('kid',session.id);},60000);
+
+// Register Service Worker
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js')
+      .then(r=>console.log('SW registered',r.scope))
+      .catch(e=>console.warn('SW failed',e));
+  });
+}
+</script>
+</body>
+</html>
