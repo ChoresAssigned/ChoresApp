@@ -2303,18 +2303,6 @@ function kidSetColor(kidId,color){
   notify('🎨 Color updated!','#7c3aed');
 }
 
-function kidUploadPhoto(kidId,input){
-  const file=input.files[0];if(!file)return;
-  if(file.size>2*1024*1024){notify('Photo too large — max 2MB','#ef4444');return;}
-  const reader=new FileReader();
-  reader.onload=e=>{
-    getKid(kidId).photo=e.target.result;
-    getKid(kidId).emoji=getKid(kidId).emoji||'⭐';
-    saveState();renderTab('kid',session.id);renderHome();
-    notify('📷 Photo updated!','#10b981');
-  };
-  reader.readAsDataURL(file);
-}
 
 let _kidEmojiTarget=null;
 function kidPickEmoji(kidId){
@@ -2471,23 +2459,6 @@ function selectProfileColor(color){
   });
 }
 
-function handlePhotoUpload(input){
-  const file=input.files[0];if(!file)return;
-  if(file.size>2*1024*1024){notify('Photo too large — max 2MB','#ef4444');return;}
-  const reader=new FileReader();
-  reader.onload=e=>{
-    const data=e.target.result;
-    document.getElementById('pe-photo').value=data;
-    document.getElementById('pe-emoji').value='';
-    const preview=document.getElementById('peAvatarPreview');
-    preview.style.backgroundImage=`url(${data})`;
-    preview.style.backgroundSize='cover';
-    preview.style.backgroundPosition='center';
-    preview.style.fontSize='0';
-    preview.textContent='';
-  };
-  reader.readAsDataURL(file);
-}
 
 function saveProfileEdit(){
   const{type,id}=_peTarget;
