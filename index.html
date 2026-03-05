@@ -571,7 +571,7 @@ let currentGameId=null,currentGameKidId=null;
 function csKey(k,c){return`${k}_${c}`}
 function getCS(k,c){return state.choreState[csKey(k,c)]||{checked:false,signed:false,cancelled:false,checkedAt:null}}
 function setCS(k,c,p){state.choreState[csKey(k,c)]=Object.assign(getCS(k,c),p)}
-function kidChores(id){return state.chores.filter(c=>c.kids.includes(id)&&(c.days.length===0||c.days.includes(TODAY_NAME)))}
+function kidChores(id){return state.chores.filter(c=>c.kids&&c.kids.includes(id)&&(!(c.days&&c.days.length)||c.days.includes(TODAY_NAME)))}
 function allSigned(id){return kidChores(id).every(c=>{const s=getCS(id,c.id);return s.signed||s.cancelled})}
 function getKid(id){return state.kids.find(k=>k.id===id)}
 function getDiff(gameId){return state.gameDifficulty[gameId]||'medium'}
@@ -1917,6 +1917,8 @@ function hydrateState(saved){
   if(!saved.rewardRequests)  saved.rewardRequests=[];
   if(!saved.gameDifficulty)  saved.gameDifficulty={pong:'medium',snake:'medium',breakout:'medium',space:'medium',dino:'medium'};
   if(!saved.leaderboard)     saved.leaderboard={pong:[],snake:[],breakout:[],space:[],dino:[]};
+  // Fix any chores missing days or kids arrays (old data)
+  if(saved.chores) saved.chores.forEach(c=>{ if(!c.days) c.days=[]; if(!c.kids) c.kids=[]; });
   return saved;
 }
 
