@@ -619,6 +619,7 @@ let state={
   rewardRequests:[],
   history:{},
   messages:[], // [{id, from, fromName, fromEmoji, to, text, time, read:[]}]
+  todos:{}, // { userId: [{id, text, done, createdAt}] }
   gameWinScore:{pong:5,snake:10,breakout:0,space:0,dino:20}, // 0 = clear all
   // difficulty per game: easy|medium|hard
   gameDifficulty:{pong:'medium',snake:'medium',breakout:'medium',space:'medium',dino:'medium'},
@@ -776,11 +777,14 @@ function buildTabs(type,id){
       {id:'profile',label:'👤 Profile'},
     ];
   }
-  else if(type==='supervisor'){tabs=[{id:'signoff',label:'✅ Sign Off'}];state.kids.forEach(k=>tabs.push({id:`view-${k.id}`,label:`${k.emoji} ${k.name}`}));}
+  else if(type==='supervisor'){
+    tabs=[{id:'signoff',label:'✅ Sign Off'},{id:'arcade',label:'🎮 Arcade'},{id:'todo',label:'📝 To-Do'}];
+    state.kids.forEach(k=>tabs.push({id:`view-${k.id}`,label:`${k.emoji} ${k.name}`}));
+  }
   else{
     const pendingReqs=(state.rewardRequests||[]).filter(r=>r.status==='pending').length;
     const rwLabel=pendingReqs>0?`🎁 Rewards <span style="background:#ef4444;color:white;border-radius:10px;padding:1px 6px;font-size:.7rem">${pendingReqs}</span>`:'🎁 Rewards';
-    tabs=[{id:'overview',label:'📊 Overview'},{id:'rewards',label:rwLabel,raw:true},{id:'history',label:'📅 History'},{id:'messages',label:'💬 Messages'},{id:'leaderboard',label:'🏆 Scores'},{id:'settings',label:'⚙️ Settings'}];
+    tabs=[{id:'overview',label:'📊 Overview'},{id:'rewards',label:rwLabel,raw:true},{id:'history',label:'📅 History'},{id:'messages',label:'💬 Messages'},{id:'todo',label:'📝 To-Do'},{id:'arcade',label:'🎮 Arcade'},{id:'leaderboard',label:'🏆 Scores'},{id:'settings',label:'⚙️ Settings'}];
     state.kids.forEach(k=>tabs.push({id:`parent-${k.id}`,label:`${k.emoji} ${k.name}`}));
   }
   activeTab=tabs[0].id;
@@ -805,12 +809,16 @@ function renderTab(type,id){
     else if(activeTab==='profile') c.innerHTML=renderKidProfile(id);
   } else if(type==='supervisor'){
     if(activeTab==='signoff') c.innerHTML=renderSignOff();
+    else if(activeTab==='arcade') c.innerHTML=renderStaffArcadeMenu(type,id);
+    else if(activeTab==='todo') c.innerHTML=renderTodo(type,id);
     else c.innerHTML=renderKidChores(getKid(parseInt(activeTab.split('-')[1])));
   } else {
     if(activeTab==='overview') c.innerHTML=renderParentOverview();
     else if(activeTab==='rewards') c.innerHTML=renderRewards(true);
     else if(activeTab==='history'){c.innerHTML='<div style="padding:16px"><button class="btn btn-primary" onclick="openHistoryModal()">📅 Open History Browser</button></div>';return;}
     else if(activeTab==='messages') c.innerHTML=renderMessages(true,id);
+    else if(activeTab==='todo') c.innerHTML=renderTodo(type,id);
+    else if(activeTab==='arcade') c.innerHTML=renderStaffArcadeMenu(type,id);
     else if(activeTab==='leaderboard') c.innerHTML=renderLeaderboard();
     else if(activeTab==='settings'){renderSettings();return;}
     else c.innerHTML=renderParentKid(parseInt(activeTab.split('-')[1]));
@@ -1881,7 +1889,302 @@ function clearGameScore(gameId){
 }
 function clearLeaderboard(){if(confirm('Clear ALL high scores?')){GAME_DEFS.forEach(g=>state.leaderboard[g.id]=[]);renderTab(session.type,session.id);saveState();notify('🗑️ All scores cleared');}}
 
-// ═══ MESSAGES / NOTIFICATIONS ═══
+// ═══ STAFF ARCADE (no point cost) ═══
+function renderStaffArcadeMenu(type,userId){
+  const profile=type==='parent'
+    ? state.parents.find(p=>p.id===userId)
+    : state.supervisors.find(s=>s.id===userId);
+  const cards=GAME_DEFS.map(g=>{
+    const diff=getDiff(g.id);
+    const diffCls=diff==='easy'?'diff-easy':diff==='hard'?'diff-hard':'diff-medium';
+    return`<div class="arcade-game-card" style="--gc:${g.color}" onclick="launchStaffGame('${g.id}','${userId}','${type}')">
+      <div class="agc-icon">${g.icon}</div>
+      <div class="agc-name">${g.name}</div>
+      <div class="agc-cost">Free to play · On leaderboard</div>
+      <div class="agc-diff ${diffCls}">${diff}</div>
+    </div>`;
+  }).join('');
+  return`<h2 class="fredoka" style="margin-bottom:4px">🎮 Arcade</h2>
+    <p style="color:var(--muted);font-size:.82rem;font-weight:700;margin-bottom:14px">Free to play — scores go on the family leaderboard!</p>
+    <div class="arcade-menu">${cards}</div>`;
+}
+
+function launchStaffGame(gameId,userId,type){
+  const profile=type==='parent'
+    ? state.parents.find(p=>p.id===userId)
+    : state.supervisors.find(s=>s.id===userId);
+  currentGameId=gameId;
+  currentGameKidId='staff_'+userId; // flag as staff
+  buildStaffArcadeScreen(gameId,profile);
+  showScreen('arcadeScreen');
+}
+
+function buildStaffArcadeScreen(gameId,profile){
+  const g=GAME_DEFS.find(x=>x.id===gameId);
+  const wrap=document.getElementById('arcadeWrap');
+  wrap.innerHTML=`
+    <div class="arcade-header">
+      <button class="btn btn-outline btn-sm" onclick="exitGame()">← Back</button>
+      <h2>${g.icon} ${g.name}</h2>
+      <div class="arcade-pts-badge" id="arcadePtsBadge">${profile.emoji} ${profile.name}</div>
+    </div>
+    <div class="game-score-bar" id="gameScoreBar"></div>
+    <div class="game-canvas-wrap">
+      <canvas id="gameCanvas"></canvas>
+      <div class="game-overlay" id="gameOverlay">
+        <div class="go-icon" id="goIcon">${g.icon}</div>
+        <div class="go-title" id="goTitle">Ready?</div>
+        <div class="go-msg" id="goMsg">${IS_MOBILE?'Use buttons below':'Use keyboard controls'}</div>
+        <button class="btn btn-sky" id="goBtn" onclick="startCurrentGame()">▶ Start!</button>
+      </div>
+    </div>
+    <div class="mobile-controls" id="mobileControls"></div>
+    <div class="desktop-hint" id="desktopHint"></div>`;
+  setTimeout(()=>{
+    const cv=document.getElementById('gameCanvas');
+    const maxW=Math.min(560,wrap.offsetWidth-4);
+    cv.width=maxW;cv.height=Math.round(maxW*0.62);
+    initGame(gameId);
+  },60);
+}
+
+// Override onGameWin/Lose to handle staff (no point changes)
+const _origOnGameWin=onGameWin;
+const _origOnGameLose=onGameLose;
+function onGameWin(score){
+  if(String(currentGameKidId).startsWith('staff_')){
+    stopCurrentGame();
+    updateStaffLeaderboard(currentGameId,currentGameKidId,score);
+    confetti();
+    showOverlay('🎉','You Won!',`Score: ${score}`,'Play Again 🔄',()=>{initGame(currentGameId);startCurrentGame();});
+    return;
+  }
+  _origOnGameWin(score);
+}
+function onGameLose(score){
+  if(String(currentGameKidId).startsWith('staff_')){
+    stopCurrentGame();
+    updateStaffLeaderboard(currentGameId,currentGameKidId,score);
+    showOverlay('😢','Game Over!',`Score: ${score}`,'Try Again',()=>{initGame(currentGameId);startCurrentGame();});
+    return;
+  }
+  _origOnGameLose(score);
+}
+
+function updateStaffLeaderboard(gameId,staffKey,score){
+  const userId=staffKey.replace('staff_','');
+  const profile=state.parents.find(p=>p.id===userId)||state.supervisors.find(s=>s.id===userId);
+  if(!profile)return;
+  if(!state.leaderboard[gameId])state.leaderboard[gameId]=[];
+  const lb=state.leaderboard[gameId];
+  const existing=lb.findIndex(e=>e.kidId===staffKey);
+  if(existing>=0){if(score>lb[existing].score)lb[existing].score=score;}
+  else lb.push({kidId:staffKey,name:profile.name,emoji:profile.emoji,score});
+  lb.sort((a,b)=>b.score-a.score);
+  saveState();
+  if(lb[0].kidId===staffKey) notify(`🏆 ${profile.name} has the new high score!`,'#f59e0b');
+}
+
+// ═══ TO-DO LIST ═══
+function renderTodo(type,userId){
+  if(!state.todos)state.todos={};
+  const todos=state.todos[userId]||[];
+  const pending=todos.filter(t=>!t.done);
+  const done=todos.filter(t=>t.done);
+  const rows=t=>t.map(item=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
+      <input type="checkbox" ${item.done?'checked':''} onchange="toggleTodo('${userId}','${item.id}',this.checked)"
+        style="width:20px;height:20px;accent-color:#ff7a00;cursor:pointer;flex-shrink:0">
+      <span style="flex:1;font-size:.9rem;font-weight:700;${item.done?'text-decoration:line-through;color:var(--muted)':''}">${item.text}</span>
+      <button onclick="deleteTodo('${userId}','${item.id}')" style="background:none;border:none;cursor:pointer;font-size:1rem;color:var(--muted);padding:2px 6px">✕</button>
+    </div>`).join('');
+  return`<h2 class="fredoka" style="margin-bottom:14px">📝 To-Do List</h2>
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;gap:8px">
+        <input class="f-inp" id="todoInput" placeholder="Add a task or reminder..." style="flex:1"
+          onkeydown="if(event.key==='Enter')addTodo('${userId}')">
+        <button class="btn btn-primary" onclick="addTodo('${userId}')">Add</button>
+      </div>
+    </div>
+    ${pending.length?`<div class="card" style="margin-bottom:12px">
+      <div style="font-weight:800;color:var(--muted);font-size:.8rem;margin-bottom:6px">PENDING (${pending.length})</div>
+      ${rows(pending)}
+    </div>`:''}
+    ${done.length?`<div class="card" style="opacity:.7">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-weight:800;color:var(--muted);font-size:.8rem">DONE (${done.length})</div>
+        <button class="btn btn-outline btn-sm" onclick="clearDoneTodos('${userId}')">Clear done</button>
+      </div>
+      ${rows(done)}
+    </div>`:''}
+    ${!todos.length?'<div style="color:var(--muted);text-align:center;padding:30px;font-weight:700">Nothing here yet — add a task! ✅</div>':''}`;
+}
+
+function addTodo(userId){
+  const inp=document.getElementById('todoInput');
+  const text=inp?.value.trim();
+  if(!text){notify('Type a task first!','#ef4444');return;}
+  if(!state.todos)state.todos={};
+  if(!state.todos[userId])state.todos[userId]=[];
+  state.todos[userId].push({id:`td_${Date.now()}`,text,done:false,createdAt:new Date().toISOString()});
+  inp.value='';saveState();renderTab(session.type,session.id);
+}
+function toggleTodo(userId,id,done){
+  const todo=(state.todos[userId]||[]).find(t=>t.id===id);
+  if(todo){todo.done=done;saveState();renderTab(session.type,session.id);}
+}
+function deleteTodo(userId,id){
+  if(!state.todos[userId])return;
+  state.todos[userId]=state.todos[userId].filter(t=>t.id!==id);
+  saveState();renderTab(session.type,session.id);
+}
+function clearDoneTodos(userId){
+  if(!state.todos[userId])return;
+  state.todos[userId]=state.todos[userId].filter(t=>!t.done);
+  saveState();renderTab(session.type,session.id);
+}
+
+// ═══ PHOTO COMPRESS + CROP ═══
+let _cropCanvas=null,_cropCtx=null,_cropImg=null,_cropState={dragging:false,x:0,y:0,size:0,sx:0,sy:0};
+let _cropCallback=null;
+
+function openCropModal(imageSrc,callback){
+  _cropCallback=callback;
+  // Build modal
+  let modal=document.getElementById('cropModal');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.id='cropModal';
+    modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:4000;display:flex;align-items:center;justify-content:center;padding:16px';
+    modal.innerHTML=`
+      <div style="background:white;border-radius:20px;padding:20px;width:100%;max-width:400px">
+        <h3 style="font-family:'Fredoka One',cursive;text-align:center;margin-bottom:12px">✂️ Crop Photo</h3>
+        <p style="font-size:.8rem;color:#6b7280;font-weight:700;text-align:center;margin-bottom:10px">Drag the circle to position your photo</p>
+        <div style="position:relative;display:flex;justify-content:center;margin-bottom:14px">
+          <canvas id="cropCanvas" style="border-radius:12px;max-width:100%;cursor:crosshair;touch-action:none"></canvas>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="confirmCrop()" style="flex:1;padding:12px;background:linear-gradient(135deg,#ff7a00,#f59e0b);color:white;border:none;border-radius:12px;font-family:'Fredoka One',cursive;font-size:1rem;cursor:pointer">✅ Use This</button>
+          <button onclick="document.getElementById('cropModal').style.display='none'" style="padding:12px 16px;background:#f3f4f6;color:#6b7280;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-weight:800;cursor:pointer">Cancel</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+  modal.style.display='flex';
+  _cropCanvas=document.getElementById('cropCanvas');
+  _cropCtx=_cropCanvas.getContext('2d');
+  _cropImg=new Image();
+  _cropImg.onload=()=>{
+    const maxSize=320;
+    const scale=Math.min(maxSize/_cropImg.width,maxSize/_cropImg.height,1);
+    _cropCanvas.width=Math.round(_cropImg.width*scale);
+    _cropCanvas.height=Math.round(_cropImg.height*scale);
+    const sz=Math.min(_cropCanvas.width,_cropCanvas.height)*0.8;
+    _cropState={dragging:false,x:(_cropCanvas.width-sz)/2,y:(_cropCanvas.height-sz)/2,size:sz,sx:0,sy:0,scale};
+    drawCrop();
+    setupCropEvents();
+  };
+  _cropImg.src=imageSrc;
+}
+
+function drawCrop(){
+  const cv=_cropCanvas,ctx=_cropCtx,s=_cropState;
+  const sw=_cropImg.width*s.scale,sh=_cropImg.height*s.scale;
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.drawImage(_cropImg,0,0,sw,sh);
+  // Darken outside circle
+  ctx.fillStyle='rgba(0,0,0,.55)';
+  ctx.fillRect(0,0,cv.width,cv.height);
+  // Cut out circle
+  ctx.save();
+  ctx.globalCompositeOperation='destination-out';
+  ctx.beginPath();
+  ctx.arc(s.x+s.size/2,s.y+s.size/2,s.size/2,0,Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+  // Draw image inside circle (clean)
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(s.x+s.size/2,s.y+s.size/2,s.size/2,0,Math.PI*2);
+  ctx.clip();
+  ctx.drawImage(_cropImg,0,0,sw,sh);
+  ctx.restore();
+  // Circle border
+  ctx.strokeStyle='#ff7a00';ctx.lineWidth=3;
+  ctx.beginPath();
+  ctx.arc(s.x+s.size/2,s.y+s.size/2,s.size/2,0,Math.PI*2);
+  ctx.stroke();
+}
+
+function setupCropEvents(){
+  const cv=_cropCanvas;
+  function getPos(e){
+    const r=cv.getBoundingClientRect();
+    const touch=e.touches?.[0]||e;
+    return{x:(touch.clientX-r.left)*(cv.width/r.width),y:(touch.clientY-r.top)*(cv.height/r.height)};
+  }
+  function start(e){e.preventDefault();_cropState.dragging=true;const p=getPos(e);_cropState.sx=p.x-_cropState.x;_cropState.sy=p.y-_cropState.y;}
+  function move(e){
+    e.preventDefault();
+    if(!_cropState.dragging)return;
+    const p=getPos(e),s=_cropState;
+    s.x=Math.max(0,Math.min(cv.width-s.size,p.x-s.sx));
+    s.y=Math.max(0,Math.min(cv.height-s.size,p.y-s.sy));
+    drawCrop();
+  }
+  function end(){_cropState.dragging=false;}
+  cv.onmousedown=start;cv.onmousemove=move;cv.onmouseup=end;
+  cv.ontouchstart=start;cv.ontouchmove=move;cv.ontouchend=end;
+}
+
+function confirmCrop(){
+  const s=_cropState;
+  // Extract the circle region from original image coords
+  const scaleBack=1/s.scale;
+  const srcX=(s.x)*scaleBack,srcY=(s.y)*scaleBack;
+  const srcSize=s.size*scaleBack;
+  // Output compressed to 200x200
+  const out=document.createElement('canvas');
+  out.width=200;out.height=200;
+  const ctx=out.getContext('2d');
+  ctx.beginPath();ctx.arc(100,100,100,0,Math.PI*2);ctx.clip();
+  ctx.drawImage(_cropImg,srcX,srcY,srcSize,srcSize,0,0,200,200);
+  const dataUrl=out.toDataURL('image/jpeg',0.7); // compress to ~30-50KB
+  document.getElementById('cropModal').style.display='none';
+  if(_cropCallback)_cropCallback(dataUrl);
+}
+
+// Wrap photo upload functions to go through crop
+function processPhotoFile(file,callback){
+  if(!file)return;
+  if(file.size>15*1024*1024){notify('Photo too large — max 15MB','#ef4444');return;}
+  const reader=new FileReader();
+  reader.onload=e=>openCropModal(e.target.result,callback);
+  reader.readAsDataURL(file);
+}
+
+// Replace handlePhotoUpload to use crop+compress
+function handlePhotoUpload(input){
+  processPhotoFile(input.files[0],(dataUrl)=>{
+    document.getElementById('pe-photo').value=dataUrl;
+    document.getElementById('pe-emoji').value='';
+    const preview=document.getElementById('peAvatarPreview');
+    preview.style.backgroundImage=`url(${dataUrl})`;
+    preview.style.backgroundSize='cover';
+    preview.style.backgroundPosition='center';
+    preview.style.fontSize='0';
+    preview.textContent='';
+  });
+}
+
+// Replace kidUploadPhoto to use crop+compress
+function kidUploadPhoto(kidId,input){
+  processPhotoFile(input.files[0],(dataUrl)=>{
+    getKid(kidId).photo=dataUrl;
+    saveState();renderTab('kid',session.id);renderHome();
+    notify('📷 Photo updated!','#10b981');
+  });
+}
 function renderMessages(isParent,userId){
   const msgs=state.messages||[];
   const myMsgs=isParent
@@ -2305,6 +2608,9 @@ function archiveToday(){
     });
   });
 }
+// Chores reset automatically at MIDNIGHT every day (not on every session open).
+// The app archives completed chores to history first, then resets check-offs.
+// Points, high scores, and profiles are NEVER auto-reset.
 function midnightReset(){
   archiveToday();
   // Reset chore states only — keep points and leaderboard
@@ -2455,6 +2761,7 @@ function hydrateState(saved){
   if(!saved.leaderboard)     saved.leaderboard={pong:[],snake:[],breakout:[],space:[],dino:[]};
   if(!saved.history)         saved.history={};
   if(!saved.messages)        saved.messages=[];
+  if(!saved.todos)           saved.todos={};
   if(!saved.gameWinScore)    saved.gameWinScore={pong:5,snake:10,breakout:0,space:0,dino:20};
   // Fix any chores missing days or kids arrays (old data)
   if(saved.chores) saved.chores.forEach(c=>{ if(!c.days) c.days=[]; if(!c.kids) c.kids=[]; });
