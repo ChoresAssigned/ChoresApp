@@ -2000,7 +2000,7 @@ async function tryAutoConnect(){
   setDotState('connecting');
   loadLocalFallback(); // show local data immediately while fetching
 
-  if(!WORKER_URL || WORKER_URL === 'PASTE_YOUR_WORKER_URL_HERE'){
+  if(!WORKER_URL || WORKER_URL === 'https://chore-config.brookzlive.workers.dev'){
     console.warn('Worker URL not set — running local-only');
     setDotState('error');
     return;
