@@ -453,28 +453,58 @@ select.diff-sel{background:var(--surface2);border:2px solid var(--border);border
 
 <!-- PROFILE EDIT MODAL -->
 <div class="modal-overlay" id="profileEditModal">
-  <div class="modal-box" style="max-width:380px">
+  <div class="modal-box" style="max-width:400px;max-height:90vh;overflow-y:auto">
     <h3 id="peTitle">✏️ Edit Profile</h3>
-    <div style="text-align:center;margin-bottom:16px">
-      <div class="parent-avatar-circle" style="margin:0 auto 8px;width:72px;height:72px;font-size:2.6rem;border-color:#f59e0b" onclick="openEmojiPicker('pe-emoji')" id="peAvatarPreview">👤</div>
-      <div style="font-size:.78rem;color:var(--muted);font-weight:700">Tap to change icon</div>
+
+    <!-- Avatar: photo or emoji -->
+    <div style="text-align:center;margin-bottom:12px">
+      <div style="position:relative;display:inline-block">
+        <div id="peAvatarPreview" onclick="openEmojiPicker('pe-emoji')"
+          style="width:80px;height:80px;border-radius:50%;border:3px solid #f59e0b;
+            background:var(--surface2);display:flex;align-items:center;justify-content:center;
+            font-size:2.8rem;cursor:pointer;margin:0 auto;overflow:hidden;transition:all .18s">👤</div>
+        <label style="position:absolute;bottom:0;right:0;background:#f59e0b;border-radius:50%;
+          width:26px;height:26px;display:flex;align-items:center;justify-content:center;
+          cursor:pointer;font-size:.8rem;border:2px solid white" title="Upload photo">
+          📷<input type="file" id="pe-photo-input" accept="image/*" style="display:none" onchange="handlePhotoUpload(this)">
+        </label>
+      </div>
+      <div style="font-size:.72rem;color:var(--muted);font-weight:700;margin-top:6px">Tap face for emoji · 📷 for photo</div>
     </div>
+
     <input type="hidden" id="pe-emoji">
+    <input type="hidden" id="pe-photo">
+
+    <!-- Name -->
     <div style="margin-bottom:8px">
       <div style="font-size:.82rem;font-weight:800;color:var(--muted);margin-bottom:4px">Name</div>
       <input class="f-inp" id="pe-name" placeholder="Name" style="width:100%">
     </div>
-    <div style="margin-bottom:8px" id="pe-pin-wrap">
+
+    <!-- PIN -->
+    <div style="margin-bottom:8px">
       <div style="font-size:.82rem;font-weight:800;color:var(--muted);margin-bottom:4px">PIN (4 digits)</div>
-      <input class="f-inp" id="pe-pin" placeholder="0000" maxlength="4" style="width:100%">
+      <input class="f-inp" id="pe-pin" placeholder="0000" maxlength="4" type="tel" style="width:100%">
     </div>
-    <div style="margin-bottom:8px" id="pe-bedtime-wrap" style="display:none">
+
+    <!-- Bedtime (kids only) -->
+    <div style="margin-bottom:8px" id="pe-bedtime-wrap">
       <div style="font-size:.82rem;font-weight:800;color:var(--muted);margin-bottom:4px">🌙 Bedtime</div>
-      <input type="time" id="pe-bedtime" style="width:100%">
+      <input type="time" id="pe-bedtime" style="width:100%;padding:8px;border-radius:9px;border:2px solid var(--border);background:var(--surface2);color:var(--text)">
     </div>
+
+    <!-- Background color (kids only) -->
+    <div style="margin-bottom:12px" id="pe-color-wrap">
+      <div style="font-size:.82rem;font-weight:800;color:var(--muted);margin-bottom:6px">🎨 Profile Color</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap" id="pe-color-swatches"></div>
+    </div>
+
     <div class="form-row" style="margin-top:14px">
-      <button class="btn btn-primary" onclick="saveProfileEdit()">Save</button>
+      <button class="btn btn-primary" onclick="saveProfileEdit()">💾 Save</button>
       <button class="btn btn-outline" onclick="closeModal('profileEditModal')">Cancel</button>
+    </div>
+    <div id="pe-delete-wrap" style="margin-top:10px;text-align:center">
+      <button class="btn btn-red btn-sm" onclick="deleteProfile()">🗑️ Delete Profile</button>
     </div>
   </div>
 </div>
@@ -485,6 +515,37 @@ select.diff-sel{background:var(--surface2);border:2px solid var(--border);border
     <h3>🎁 Reward Requests</h3>
     <div id="rewardApprovalList"></div>
     <button class="btn btn-outline" style="margin-top:12px;width:100%" onclick="closeModal('rewardApprovalModal')">Close</button>
+  </div>
+</div>
+
+<!-- ADJUST POINTS MODAL -->
+<div class="modal-overlay" id="adjustPointsModal">
+  <div class="modal-box" style="max-width:340px">
+    <h3>⭐ Adjust Points</h3>
+    <div id="adjustPointsKidInfo" style="text-align:center;margin-bottom:14px;font-size:1.1rem;font-weight:800"></div>
+    <div style="font-size:.82rem;font-weight:800;color:var(--muted);margin-bottom:6px">Amount (use - for deduction)</div>
+    <input class="f-inp" id="adjustPointsAmount" type="number" placeholder="e.g. 5 or -3" style="width:100%;margin-bottom:8px">
+    <input class="f-inp" id="adjustPointsReason" placeholder="Reason (optional)" style="width:100%;margin-bottom:14px">
+    <div class="form-row">
+      <button class="btn btn-primary" onclick="saveAdjustPoints()">Apply</button>
+      <button class="btn btn-outline" onclick="closeModal('adjustPointsModal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- DAILY HISTORY MODAL -->
+<div class="modal-overlay" id="historyModal">
+  <div class="modal-box" style="max-width:480px;max-height:85vh;overflow-y:auto">
+    <h3>📅 Chore History</h3>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+      <select id="historyKidSel" onchange="renderHistoryModal()" class="diff-sel" style="flex:1">
+        <option value="all">All Kids</option>
+      </select>
+      <input type="date" id="historyDateSel" onchange="renderHistoryModal()"
+        style="flex:1;padding:7px 10px;border-radius:9px;border:2px solid var(--border);background:var(--surface2);color:var(--text)">
+    </div>
+    <div id="historyModalContent"></div>
+    <button class="btn btn-outline" style="margin-top:12px;width:100%" onclick="closeModal('historyModal')">Close</button>
   </div>
 </div>
 
@@ -528,10 +589,10 @@ const GAME_DEFS=[
 
 let state={
   kids:[
-    {id:0,name:'Legend',emoji:'🦅',pin:'1111',bedtime:'20:30',points:0,pointLog:[],loggedInAt:null,approvedAt:null,homeTime:null,tidyChecked:false,tidySigned:false},
-    {id:1,name:'Luke',  emoji:'🐉',pin:'2222',bedtime:'20:30',points:0,pointLog:[],loggedInAt:null,approvedAt:null,homeTime:null,tidyChecked:false,tidySigned:false},
-    {id:2,name:'Dom',   emoji:'🔥',pin:'3333',bedtime:'21:00',points:0,pointLog:[],loggedInAt:null,approvedAt:null,homeTime:null,tidyChecked:false,tidySigned:false},
-    {id:3,name:'Chase', emoji:'⚡',pin:'4444',bedtime:'21:00',points:0,pointLog:[],loggedInAt:null,approvedAt:null,homeTime:null,tidyChecked:false,tidySigned:false},
+    {id:0,name:'Legend',emoji:'🦅',pin:'1111',bedtime:'20:30',points:0,pointLog:[],loggedInAt:null,approvedAt:null,homeTime:null,tidyChecked:false,tidySigned:false,bgColor:'#ff3d6e'},
+    {id:1,name:'Luke',  emoji:'🐉',pin:'2222',bedtime:'20:30',points:0,pointLog:[],loggedInAt:null,approvedAt:null,homeTime:null,tidyChecked:false,tidySigned:false,bgColor:'#00b896'},
+    {id:2,name:'Dom',   emoji:'🔥',pin:'3333',bedtime:'21:00',points:0,pointLog:[],loggedInAt:null,approvedAt:null,homeTime:null,tidyChecked:false,tidySigned:false,bgColor:'#ff7a00'},
+    {id:3,name:'Chase', emoji:'⚡',pin:'4444',bedtime:'21:00',points:0,pointLog:[],loggedInAt:null,approvedAt:null,homeTime:null,tidyChecked:false,tidySigned:false,bgColor:'#7c3aed'},
   ],
   supervisors:[{id:'s0',name:'Supervisor',emoji:'👁️',pin:'5678',role:'supervisor'}],
   parents:[{id:'p0',name:'Parent',emoji:'👑',pin:'1234',role:'parent'}],
@@ -556,6 +617,7 @@ let state={
   ],
   nextRewardId:8, nextChoreId:6,
   rewardRequests:[],
+  history:{}, // { 'YYYY-MM-DD': { kidId: { choreName: 'signed'|'checked'|'cancelled', ... } } }
   // difficulty per game: easy|medium|hard
   gameDifficulty:{pong:'medium',snake:'medium',breakout:'medium',space:'medium',dino:'medium'},
   // leaderboard: { gameId: [ {name, emoji, score, kidId} ] }  (top 5 per game)
@@ -575,6 +637,13 @@ function kidChores(id){return state.chores.filter(c=>c.kids&&c.kids.includes(id)
 function allSigned(id){return kidChores(id).every(c=>{const s=getCS(id,c.id);return s.signed||s.cancelled})}
 function getKid(id){return state.kids.find(k=>k.id===id)}
 function getDiff(gameId){return state.gameDifficulty[gameId]||'medium'}
+function formatTime12(t){
+  if(!t)return'';
+  const [h,m]=t.split(':').map(Number);
+  const ampm=h>=12?'PM':'AM';
+  const hr=h%12||12;
+  return`${hr}:${String(m).padStart(2,'0')} ${ampm}`;
+}
 
 // ═══ CLOCK ═══
 function tick(){
@@ -621,13 +690,16 @@ function goHome(){
 
 // ═══ HOME ═══
 function renderHome(){
-  document.getElementById('profileGrid').innerHTML=state.kids.map((k,i)=>`
-    <div class="profile-card" style="--clr:${KC[i]}" onclick="startPin('kid',${k.id})">
-      <div class="profile-dot" style="background:${KC[i]};box-shadow:0 0 0 3px white,0 0 0 5px ${KC[i]}"></div>
-      <span class="profile-emoji">${k.emoji}</span>
-      <div class="profile-name" style="color:${KC[i]}">${k.name}</div>
+  document.getElementById('profileGrid').innerHTML=state.kids.map((k,i)=>{
+    const avatar=k.photo
+      ?`<img src="${k.photo}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:3px solid ${k.bgColor||KC[i]}">`
+      :`<span class="profile-emoji">${k.emoji}</span>`;
+    return`<div class="profile-card" style="--clr:${k.bgColor||KC[i]}" onclick="startPin('kid',${k.id})">
+      <div class="profile-dot" style="background:${k.bgColor||KC[i]};box-shadow:0 0 0 3px white,0 0 0 5px ${k.bgColor||KC[i]}"></div>
+      ${avatar}
+      <div class="profile-name" style="color:${k.bgColor||KC[i]}">${k.name}</div>
       <div class="profile-pts">${k.points} ⭐ pts</div>
-    </div>`).join('');
+    </div>`;}).join('');
   const allStaff=[
     ...state.supervisors.map(s=>({...s,type:'supervisor',clr:'#7c3aed'})),
     ...state.parents.map(p=>({...p,type:'parent',clr:'#d97706'})),
@@ -647,9 +719,16 @@ function startPin(type,id){
   else if(type==='supervisor')p=state.supervisors.find(s=>s.id===id);
   else p=state.parents.find(x=>x.id===id);
   const fill=type==='kid'?KC[id]:type==='supervisor'?'#7c3aed':'#f59e0b';
-  document.getElementById('pinAvatar').textContent=p?.emoji||'👤';
+  const avatar=document.getElementById('pinAvatar');
+  if(p?.photo){
+    avatar.innerHTML=`<img src="${p.photo}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:4px solid ${fill}">`;
+    avatar.textContent='';
+  } else {
+    avatar.textContent=p?.emoji||'👤';
+    avatar.style.backgroundImage='';
+  }
   document.getElementById('pinName').textContent=p?.name||'User';
-  document.getElementById('pinHint').textContent=type==='parent'?'(Default: 1234)':type==='supervisor'?'(Default: 5678)':`(Default: ${['1111','2222','3333','4444'][id]||'0000'})`;
+  document.getElementById('pinHint').textContent='';
   document.querySelectorAll('.pin-dot').forEach(d=>d.style.setProperty('--fill',fill));
   showScreen('pinScreen');
 }
@@ -687,7 +766,7 @@ function buildTabs(type,id){
   else{
     const pendingReqs=(state.rewardRequests||[]).filter(r=>r.status==='pending').length;
     const rwLabel=pendingReqs>0?`🎁 Rewards <span style="background:#ef4444;color:white;border-radius:10px;padding:1px 6px;font-size:.7rem">${pendingReqs}</span>`:'🎁 Rewards';
-    tabs=[{id:'overview',label:'📊 Overview'},{id:'rewards',label:rwLabel,raw:true},{id:'leaderboard',label:'🏆 Scores'},{id:'settings',label:'⚙️ Settings'}];
+    tabs=[{id:'overview',label:'📊 Overview'},{id:'rewards',label:rwLabel,raw:true},{id:'history',label:'📅 History'},{id:'leaderboard',label:'🏆 Scores'},{id:'settings',label:'⚙️ Settings'}];
     state.kids.forEach(k=>tabs.push({id:`parent-${k.id}`,label:`${k.emoji} ${k.name}`}));
   }
   activeTab=tabs[0].id;
@@ -714,6 +793,7 @@ function renderTab(type,id){
   } else {
     if(activeTab==='overview') c.innerHTML=renderParentOverview();
     else if(activeTab==='rewards') c.innerHTML=renderRewards(true);
+    else if(activeTab==='history'){c.innerHTML='<div style="padding:16px"><button class="btn btn-primary" onclick="openHistoryModal()">📅 Open History Browser</button></div>';return;}
     else if(activeTab==='leaderboard') c.innerHTML=renderLeaderboard();
     else if(activeTab==='settings'){renderSettings();return;}
     else c.innerHTML=renderParentKid(parseInt(activeTab.split('-')[1]));
@@ -1518,15 +1598,17 @@ function renderSignOff(){
 
 // ═══ PARENT ═══
 function renderParentOverview(){
-  return`<h2 class="fredoka" style="margin-bottom:14px">📊 Overview</h2>`+state.kids.map(kid=>{
+  return`<h2 class="fredoka" style="margin-bottom:14px">📊 Overview</h2>`+state.kids.map((kid,i)=>{
     const chores=kidChores(kid.id),signed=chores.filter(c=>getCS(kid.id,c.id).signed).length;
-    return`<div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-color:${KBD[kid.id]}">
-      <div style="font-size:1.9rem">${kid.emoji}</div>
-      <div style="flex:1"><div style="font-weight:800;color:${KC[kid.id]}">${kid.name}</div>
-        <div style="font-size:.78rem;color:var(--muted);font-weight:700">${signed}/${chores.length} signed · Bedtime ${kid.bedtime}</div>
-        <div class="progress-track" style="margin-top:5px"><div class="progress-fill" style="width:${chores.length?signed/chores.length*100:100}%;background:${KC[kid.id]}"></div></div></div>
-      <div style="font-family:'Fredoka One',cursive;font-size:1.7rem;color:${KC[kid.id]}">${kid.points} ⭐</div>
+    const bt=formatTime12(kid.bedtime);
+    return`<div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-color:${KBD[i]};cursor:pointer" onclick="activeTab='kid-${kid.id}';renderTab('parent',session.id)">
+      <div style="font-size:1.9rem">${kid.photo?`<img src="${kid.photo}" style="width:44px;height:44px;border-radius:50%;object-fit:cover">`:kid.emoji}</div>
+      <div style="flex:1"><div style="font-weight:800;color:${KC[i]}">${kid.name}</div>
+        <div style="font-size:.78rem;color:var(--muted);font-weight:700">${signed}/${chores.length} signed · 🌙 ${bt}</div>
+        <div class="progress-track" style="margin-top:5px"><div class="progress-fill" style="width:${chores.length?signed/chores.length*100:100}%;background:${KC[i]}"></div></div></div>
+      <div style="font-family:'Fredoka One',cursive;font-size:1.7rem;color:${KC[i]}">${kid.points} ⭐</div>
       ${kid.approvedAt?'<span class="badge badge-signed">✅ Free</span>':''}
+      <span style="font-size:.8rem;color:var(--muted)">›</span>
     </div>`;}).join('');
 }
 function renderParentKid(kidId){
@@ -1536,6 +1618,7 @@ function renderParentKid(kidId){
     return`<div class="sign-row"><span>${cs.cancelled?'🚫':cs.signed?'✅':cs.checked?'⏳':'◻️'}</span><span style="flex:1">${c.name}</span>
       <div style="display:flex;gap:4px">
         ${!cs.signed&&!cs.cancelled&&cs.checked?`<button class="btn btn-green btn-sm" onclick="signChore(${kidId},${c.id})">Sign</button>`:''}
+        ${cs.signed||cs.checked?`<button class="btn btn-outline btn-sm" onclick="resetChore(${kidId},${c.id})">↩️</button>`:''}
         <button class="btn ${cs.cancelled?'btn-outline':'btn-red'} btn-sm" onclick="cancelChore(${kidId},${c.id})">${cs.cancelled?'Restore':'Cancel'}</button>
       </div></div>`;}).join('');
   const i=kidId<KC.length?kidId:0;
@@ -1545,14 +1628,15 @@ function renderParentKid(kidId){
       <div style="flex:1">
         <div style="font-family:'Fredoka One',cursive;font-size:1.25rem;color:${KC[i]}">${kid.name}</div>
         <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
-          <span style="font-size:.78rem;color:var(--muted);font-weight:700">🌙 Bedtime:</span>
-          <input type="time" value="${kid.bedtime}" onchange="setBedtime(${kidId},this.value)" style="font-size:.82rem;padding:3px 7px;border-radius:8px;border:2px solid var(--border);background:var(--surface2);color:var(--text)">
+          <span style="font-size:.78rem;color:var(--muted);font-weight:700">🌙 Bedtime: <strong>${formatTime12(kid.bedtime)}</strong></span>
+          <input type="time" value="${kid.bedtime}" onchange="setBedtime(${kidId},this.value)" style="font-size:.78rem;padding:3px 7px;border-radius:8px;border:2px solid var(--border);background:var(--surface2);color:var(--text);opacity:.7">
         </div>
       </div>
       <div style="font-family:'Fredoka One',cursive;font-size:1.8rem;color:${KC[i]}">${kid.points} ⭐</div></div>
     <div style="display:flex;gap:7px;margin-top:10px;flex-wrap:wrap">
       ${!kid.loggedInAt?`<button class="btn btn-green btn-sm" onclick="loginKid(${kidId})">Log Home</button>`:`<span class="badge badge-signed">🏠 Home</span>`}
       <button class="btn btn-gold btn-sm" onclick="giveBonus(${kidId})">⭐ Bonus +1</button>
+      <button class="btn btn-outline btn-sm" onclick="openAdjustPoints(${kidId})">✏️ Adjust Points</button>
       ${kid.approvedAt?'<span class="badge badge-signed">✅ Free</span>':''}
     </div></div>
   <div class="section-head">📋 Chores</div>
@@ -1566,46 +1650,99 @@ function renderRewards(isParent=false){
   const kidId=session.type==='kid'?session.id:null;
   const kid=kidId!==null?getKid(kidId):null;
   const pendingCount=(state.rewardRequests||[]).filter(r=>r.status==='pending').length;
+  const isSunday=new Date().getDay()===0;
   const cards=state.rewards.map(r=>{
     const editBtns=isParent?`<div style="display:flex;gap:5px;margin-bottom:7px"><button class="btn btn-outline btn-sm" onclick="editReward(${r.id})">✏️</button><button class="btn btn-red btn-sm" onclick="deleteReward(${r.id})">🗑️</button></div>`:'';
     if(isParent){
       const kidBtns=state.kids.map((k,i)=>`<button class="rw-kid-btn" style="background:${KB[i]};color:${KC[i]};border-color:${KC[i]}" onclick="redeemReward(${k.id},${r.id})">${k.emoji} ${k.points}⭐</button>`).join('');
       return`<div class="reward-card">${editBtns}<div class="rw-icon">${r.icon}</div><div class="rw-name">${r.name}</div><div class="rw-cost">${r.cost} ⭐</div><div class="rw-desc">${r.desc}</div><div style="font-size:.7rem;color:var(--muted);margin-bottom:5px">Redeem for:</div><div class="rw-kids">${kidBtns}</div></div>`;
     } else {
-      // Kid view — show request button
       const myReq=(state.rewardRequests||[]).find(x=>x.kidId===kidId&&x.rewardId===r.id&&x.status==='pending');
       const canAfford=kid&&kid.points>=r.cost;
       let actionBtn='';
       if(myReq){
-        actionBtn=`<div class="req-badge req-pending" style="margin-top:8px;display:flex;gap:6px;align-items:center">⏳ Awaiting approval <button onclick="cancelRewardRequest('${myReq.id}')" style="background:none;border:none;cursor:pointer;font-size:.9rem;margin-left:4px">✕</button></div>`;
+        actionBtn=`<div class="req-badge req-pending" style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          ⏳ Pending${myReq.redeemDay?` · Use on <strong>${myReq.redeemDay}</strong>`:''}
+          <button onclick="cancelRewardRequest('${myReq.id}')" style="background:none;border:none;cursor:pointer;font-size:.9rem">✕</button>
+        </div>`;
       } else if(canAfford){
-        actionBtn=`<button class="btn btn-gold btn-sm" style="margin-top:8px;width:100%" onclick="requestReward(${r.id})">🎁 Request (${r.cost} ⭐)</button>`;
+        actionBtn=`<button class="btn btn-gold btn-sm" style="margin-top:8px;width:100%" onclick="openRequestReward(${r.id})">🎁 Request (${r.cost} ⭐)</button>`;
       } else {
-        actionBtn=`<div style="margin-top:8px;font-size:.75rem;color:var(--muted);font-weight:700">Need ${r.cost-kid.points} more ⭐</div>`;
+        actionBtn=`<div style="margin-top:8px;font-size:.75rem;color:var(--muted);font-weight:700">Need ${r.cost-(kid?.points||0)} more ⭐</div>`;
       }
       return`<div class="reward-card">${editBtns}<div class="rw-icon">${r.icon}</div><div class="rw-name">${r.name}</div><div class="rw-cost">${r.cost} ⭐</div><div class="rw-desc">${r.desc}</div>${actionBtn}</div>`;
     }
   }).join('');
   const addBtn=isParent?`<button class="btn btn-primary" style="margin-bottom:14px" onclick="openAddReward()">➕ Add Reward</button>`:'';
   const approvalBtn=isParent&&pendingCount>0?`<button class="btn btn-orange" style="margin-bottom:14px;margin-left:8px" onclick="openRewardApprovals()">🎁 ${pendingCount} Request${pendingCount>1?'s':''} Pending</button>`:'';
-  return`<h2 class="fredoka" style="margin-bottom:10px">🎁 Rewards Store</h2><div style="margin-bottom:4px">${addBtn}${approvalBtn}</div><div class="rewards-grid">${cards}</div>`;
+  const sundayBanner=!isParent&&isSunday?`<div style="background:linear-gradient(135deg,#f59e0b,#ff7a00);color:white;border-radius:14px;padding:12px 16px;margin-bottom:12px;font-weight:800;font-size:.9rem">🌟 Sunday Pick Day! Choose your reward and pick a day to use it.</div>`:'';
+  const kidNote=!isParent?`<div style="font-size:.78rem;color:var(--muted);font-weight:700;margin-bottom:12px">💡 Request any reward anytime. Pick the day you want to use it — parent approves on Sunday.</div>`:'';
+  return`<h2 class="fredoka" style="margin-bottom:10px">🎁 Rewards Store</h2>${sundayBanner}${kidNote}<div style="margin-bottom:4px">${addBtn}${approvalBtn}</div><div class="rewards-grid">${cards}</div>`;
 }
 
-function requestReward(rewardId){
+// Reward request modal — lets kid pick a day
+let _reqRewardId=null;
+function openRequestReward(rewardId){
+  _reqRewardId=rewardId;
+  const r=state.rewards.find(x=>x.id===rewardId);
+  const kid=getKid(session.id);
+  if(!r||!kid)return;
+  // Build day picker inline using a simple modal via notify approach — use a small inline overlay
+  const existing=document.getElementById('rewardDayOverlay');
+  if(existing)existing.remove();
+  const overlay=document.createElement('div');
+  overlay.id='rewardDayOverlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(26,39,68,.7);z-index:2500;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.innerHTML=`
+    <div style="background:white;border-radius:20px;padding:24px;width:100%;max-width:340px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+      <div style="text-align:center;margin-bottom:16px">
+        <div style="font-size:2.5rem">${r.icon}</div>
+        <div style="font-family:'Fredoka One',cursive;font-size:1.2rem;color:#ff7a00">${r.name}</div>
+        <div style="font-size:.82rem;color:#a07840;font-weight:700">${r.cost} ⭐</div>
+      </div>
+      <div style="font-size:.85rem;font-weight:800;color:#6b7280;margin-bottom:8px">Which day do you want to use this?</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:16px">
+        ${['Mon','Tue','Wed','Thu','Fri','Sat','Sun','Any'].map(d=>`
+          <button onclick="selectRedeemDay('${d}',this)" style="padding:8px 4px;border-radius:10px;border:2px solid #ffd49a;
+            background:#fff9f0;color:#2d2013;font-family:'Nunito',sans-serif;font-weight:800;font-size:.8rem;cursor:pointer;transition:all .15s">${d}</button>
+        `).join('')}
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onclick="confirmRewardRequest()" style="flex:1;padding:11px;background:linear-gradient(135deg,#f59e0b,#ff7a00);color:white;border:none;border-radius:12px;font-family:'Fredoka One',cursive;font-size:1rem;cursor:pointer">Request 🎁</button>
+        <button onclick="document.getElementById('rewardDayOverlay').remove()" style="padding:11px 14px;background:#f3f4f6;color:#6b7280;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-weight:800;cursor:pointer">Cancel</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+let _selectedRedeemDay='Any';
+function selectRedeemDay(day,btn){
+  _selectedRedeemDay=day;
+  document.querySelectorAll('#rewardDayOverlay button').forEach(b=>{
+    b.style.background='#fff9f0';b.style.color='#2d2013';b.style.borderColor='#ffd49a';
+  });
+  btn.style.background='#ff7a00';btn.style.color='white';btn.style.borderColor='#ff7a00';
+}
+function confirmRewardRequest(){
+  const rewardId=_reqRewardId;
   const kid=getKid(session.id);const r=state.rewards.find(x=>x.id===rewardId);
   if(!r||!kid)return;
   if(kid.points<r.cost){notify(`Need ${r.cost} ⭐ to request`,'#ef4444');return;}
   if(!state.rewardRequests)state.rewardRequests=[];
-  // Check no duplicate pending
   if(state.rewardRequests.find(x=>x.kidId===kid.id&&x.rewardId===rewardId&&x.status==='pending')){notify('Already requested!','#f59e0b');return;}
-  state.rewardRequests.push({id:`req_${Date.now()}`,kidId:kid.id,rewardId,status:'pending',time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
-  notify(`${kid.emoji} Reward requested! Waiting for parent approval 🙏`,'#7c3aed');
+  state.rewardRequests.push({
+    id:`req_${Date.now()}`,kidId:kid.id,rewardId,status:'pending',
+    redeemDay:_selectedRedeemDay||'Any',
+    time:new Date().toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
+  });
+  document.getElementById('rewardDayOverlay')?.remove();
+  notify(`${kid.emoji} Reward requested for ${_selectedRedeemDay||'Any day'}! Waiting for parent 🙏`,'#7c3aed');
   renderTab(session.type,session.id);saveState();
 }
+
 function cancelRewardRequest(reqId){
   if(!state.rewardRequests)return;
   state.rewardRequests=state.rewardRequests.filter(r=>r.id!==reqId);
-  renderTab(session.type,session.id);notify('Request cancelled');
+  renderTab(session.type,session.id);saveState();notify('Request cancelled');
 }
 function openRewardApprovals(){
   if(!state.rewardRequests)state.rewardRequests=[];
@@ -1620,10 +1757,10 @@ function openRewardApprovals(){
       <div style="font-size:1.6rem">${reward.icon}</div>
       <div style="flex:1">
         <div style="font-weight:800">${kid.emoji} ${kid.name} wants <strong>${reward.name}</strong></div>
-        <div style="font-size:.75rem;color:var(--muted)">${reward.cost} ⭐ · Requested ${req.time} · ${kid.points} ⭐ available</div>
+        <div style="font-size:.75rem;color:var(--muted)">${reward.cost} ⭐ · ${req.time}${req.redeemDay?` · Use on: <strong>${req.redeemDay}</strong>`:''} · ${kid.points} ⭐ available</div>
       </div>
       <div style="display:flex;gap:5px">
-        <button class="btn btn-green btn-sm" onclick="approveRewardRequest('${req.id}')">✓ Approve</button>
+        <button class="btn btn-green btn-sm" onclick="approveRewardRequest('${req.id}')">✓</button>
         <button class="btn btn-red btn-sm" onclick="denyRewardRequest('${req.id}')">✕</button>
       </div>
     </div>`;
@@ -1636,7 +1773,7 @@ function approveRewardRequest(reqId){
   if(!kid||!reward)return;
   if(kid.points<reward.cost){notify(`${kid.name} doesn't have enough points!`,'#ef4444');req.status='denied';openRewardApprovals();return;}
   kid.points-=reward.cost;
-  kid.pointLog.unshift({amount:-reward.cost,reason:`🎁 Redeemed: ${reward.name}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+  kid.pointLog.unshift({amount:-reward.cost,reason:`🎁 Redeemed: ${reward.name}${req.redeemDay?` (${req.redeemDay})`:''}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
   req.status='approved';confetti();
   notify(`🎉 Approved! ${kid.emoji} ${kid.name} redeemed "${reward.name}"!`,'#f59e0b');
   openRewardApprovals();renderTab(session.type,session.id);saveState();
@@ -1652,7 +1789,7 @@ function renderSettings(){
   const kidCards=state.kids.map((k,i)=>`
     <div class="profile-list-item" style="border-color:${KBD[i]}">
       <div class="parent-avatar-circle" style="width:44px;height:44px;font-size:1.5rem;border-color:${KC[i]};flex-shrink:0;cursor:pointer" onclick="openProfileEdit('kid',${k.id})">${k.emoji}</div>
-      <div class="info"><div class="name" style="color:${KC[i]}">${k.name}</div><div class="sub">PIN: ${k.pin} · Bed: ${k.bedtime}</div></div>
+      <div class="info"><div class="name" style="color:${KC[i]};">${k.name}</div><div class="sub">PIN: ${k.pin} · Bed: ${formatTime12(k.bedtime)}</div></div>
       <button class="btn btn-outline btn-sm" onclick="openProfileEdit('kid',${k.id})">✏️ Edit</button>
     </div>`).join('');
   const supCards=state.supervisors.map(s=>`
@@ -1678,7 +1815,12 @@ function renderSettings(){
     <div class="setting-card" style="grid-column:1/-1"><h3>🎮 Game Difficulty</h3><p style="font-size:.8rem;color:var(--muted);margin-bottom:12px;font-weight:700">Set per-game difficulty.</p>${diffRows}<button class="btn btn-red btn-sm" style="margin-top:12px" onclick="clearLeaderboard()">🗑️ Clear All Scores</button></div>
     <div class="setting-card" style="grid-column:1/-1"><h3>🔥 Sync Status</h3>
       <p style="font-size:.85rem;font-weight:700;margin-bottom:8px">Firebase: ${fbConfigured?'<span style="color:#10b981">✅ Connected — all devices are synced</span>':'<span style="color:#ef4444">❌ Not connected — running on local data only</span>'}</p>
-      <p style="font-size:.78rem;color:var(--muted);font-weight:700">Config is fetched automatically from your Cloudflare Worker. No action needed.</p>
+      <p style="font-size:.78rem;color:var(--muted);font-weight:700;margin-bottom:12px">Config is fetched automatically from your Cloudflare Worker.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-orange btn-sm" onclick="openHistoryModal()">📅 View History</button>
+        <button class="btn btn-red btn-sm" onclick="fullDatabaseWipe()">💣 Wipe All Data</button>
+        <button class="btn btn-outline btn-sm" onclick="if(confirm('Reset today\\'s chores for all kids?')){archiveToday();state.choreState={};state.kids.forEach(k=>{k.loggedInAt=null;k.approvedAt=null;k.homeTime=null;k.tidyChecked=false;k.tidySigned=false;});saveState();renderTab(session.type,session.id);notify('↩️ Chores reset for today');}">↩️ Reset Today's Chores</button>
+      </div>
     </div>
   </div>`;
 }
@@ -1766,46 +1908,101 @@ function deleteChore(id){state.chores=state.chores.filter(c=>c.id!==id);renderTa
 document.addEventListener('click',e=>{if(e.target.classList.contains('day-tag'))e.target.classList.toggle('on');});
 
 // ═══ PROFILE EDIT MODAL (unified) ═══
+const PROFILE_COLORS=['#ff3d6e','#00b896','#ff7a00','#7c3aed','#0ea5e9','#10b981','#f59e0b','#ec4899','#6366f1','#14b8a6'];
 let _peTarget={type:null,id:null};
+
 function openProfileEdit(type,id){
   _peTarget={type,id};
   let profile;
-  if(type==='kid')profile=getKid(id);
-  else if(type==='supervisor')profile=state.supervisors.find(s=>s.id===id);
+  if(type==='kid') profile=getKid(id);
+  else if(type==='supervisor') profile=state.supervisors.find(s=>s.id===id);
   else profile=state.parents.find(p=>p.id===id);
   if(!profile)return;
   document.getElementById('peTitle').textContent=`✏️ Edit ${type==='kid'?'Kid':'Staff'} Profile`;
+  const preview=document.getElementById('peAvatarPreview');
   document.getElementById('pe-emoji').value=profile.emoji||'👤';
-  document.getElementById('peAvatarPreview').textContent=profile.emoji||'👤';
+  document.getElementById('pe-photo').value=profile.photo||'';
+  if(profile.photo){
+    preview.style.backgroundImage=`url(${profile.photo})`;
+    preview.style.backgroundSize='cover';
+    preview.style.backgroundPosition='center';
+    preview.style.fontSize='0';
+    preview.textContent='';
+  } else {
+    preview.style.backgroundImage='';
+    preview.style.fontSize='2.8rem';
+    preview.textContent=profile.emoji||'👤';
+  }
   document.getElementById('pe-name').value=profile.name||'';
   document.getElementById('pe-pin').value=profile.pin||'';
   const bedWrap=document.getElementById('pe-bedtime-wrap');
+  const colorWrap=document.getElementById('pe-color-wrap');
   if(type==='kid'){
     bedWrap.style.display='block';
+    colorWrap.style.display='block';
     document.getElementById('pe-bedtime').value=profile.bedtime||'20:00';
+    const cur=profile.bgColor||KC[id%KC.length];
+    document.getElementById('pe-color-swatches').innerHTML=PROFILE_COLORS.map(c=>`
+      <div onclick="selectProfileColor('${c}')" data-color="${c}" style="width:32px;height:32px;border-radius:50%;background:${c};cursor:pointer;
+        border:3px solid ${c===cur?'#2d2013':'transparent'};box-shadow:${c===cur?'0 0 0 2px white inset':'none'};transition:all .15s"></div>
+    `).join('');
   } else {
     bedWrap.style.display='none';
+    colorWrap.style.display='none';
   }
+  const delWrap=document.getElementById('pe-delete-wrap');
+  delWrap.style.display=(type==='parent'&&state.parents.length<=1)?'none':'block';
   openModal('profileEditModal');
 }
+
+function selectProfileColor(color){
+  document.querySelectorAll('#pe-color-swatches [data-color]').forEach(el=>{
+    const c=el.dataset.color;
+    el.style.border=`3px solid ${c===color?'#2d2013':'transparent'}`;
+    el.style.boxShadow=c===color?'0 0 0 2px white inset':'none';
+  });
+}
+
+function handlePhotoUpload(input){
+  const file=input.files[0];if(!file)return;
+  if(file.size>2*1024*1024){notify('Photo too large — max 2MB','#ef4444');return;}
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const data=e.target.result;
+    document.getElementById('pe-photo').value=data;
+    document.getElementById('pe-emoji').value='';
+    const preview=document.getElementById('peAvatarPreview');
+    preview.style.backgroundImage=`url(${data})`;
+    preview.style.backgroundSize='cover';
+    preview.style.backgroundPosition='center';
+    preview.style.fontSize='0';
+    preview.textContent='';
+  };
+  reader.readAsDataURL(file);
+}
+
 function saveProfileEdit(){
   const{type,id}=_peTarget;
   const emoji=document.getElementById('pe-emoji').value.trim()||'👤';
+  const photo=document.getElementById('pe-photo').value.trim();
   const name=document.getElementById('pe-name').value.trim();
   const pin=document.getElementById('pe-pin').value.trim();
   if(!name){notify('Enter a name!','#ef4444');return;}
   if(pin&&pin.length!==4){notify('PIN must be exactly 4 digits!','#ef4444');return;}
   let profile;
-  if(type==='kid'){profile=getKid(id);if(pin)profile.pin=pin;profile.bedtime=document.getElementById('pe-bedtime').value||profile.bedtime;}
-  else if(type==='supervisor')profile=state.supervisors.find(s=>s.id===id);
+  if(type==='kid') profile=getKid(id);
+  else if(type==='supervisor') profile=state.supervisors.find(s=>s.id===id);
   else profile=state.parents.find(p=>p.id===id);
   if(!profile)return;
-  profile.emoji=emoji;profile.name=name;
-  if(pin&&type!=='kid')profile.pin=pin;
-  // Update home screen if this is the current session user
-  if(session.id===id){
-    document.getElementById('userEm').textContent=emoji;
-    document.getElementById('userName').textContent=name;
+  profile.name=name;
+  profile.emoji=emoji;
+  profile.photo=photo||null;
+  if(pin) profile.pin=pin;
+  if(type==='kid'){
+    profile.bedtime=document.getElementById('pe-bedtime').value||profile.bedtime;
+    const active=[...document.querySelectorAll('#pe-color-swatches [data-color]')]
+      .find(el=>el.style.boxShadow.includes('inset'));
+    if(active) profile.bgColor=active.dataset.color;
   }
   closeModal('profileEditModal');
   renderTab(session.type,session.id);
@@ -1813,25 +2010,153 @@ function saveProfileEdit(){
   saveState();
   notify(`✅ ${name} updated!`);
 }
+
+function deleteProfile(){
+  const{type,id}=_peTarget;
+  let name='';
+  if(type==='kid'){
+    const k=getKid(id);name=k?.name||'Kid';
+    if(!confirm(`Delete ${name}? This removes all their data.`))return;
+    state.kids=state.kids.filter(k=>k.id!==id);
+    Object.keys(state.choreState).forEach(k=>{if(k.startsWith(`${id}_`))delete state.choreState[k];});
+    state.rewardRequests=(state.rewardRequests||[]).filter(r=>r.kidId!==id);
+  } else if(type==='supervisor'){
+    const s=state.supervisors.find(x=>x.id===id);name=s?.name||'Supervisor';
+    if(!confirm(`Delete ${name}?`))return;
+    state.supervisors=state.supervisors.filter(x=>x.id!==id);
+  } else {
+    if(state.parents.length<=1){notify('Cannot delete the last parent!','#ef4444');return;}
+    const p=state.parents.find(x=>x.id===id);name=p?.name||'Parent';
+    if(!confirm(`Delete ${name}?`))return;
+    state.parents=state.parents.filter(x=>x.id!==id);
+  }
+  closeModal('profileEditModal');
+  if(session.id===id) goHome();
+  else{renderTab(session.type,session.id);renderHome();}
+  saveState();
+  notify(`🗑️ ${name} deleted`);
+}
+
 function addKidProfile(){
   const name=prompt('Kid name:');if(!name)return;
   const pin=prompt('4-digit PIN:','0000');
-  const emoji=prompt('Emoji (or use settings to change with picker):','⭐');
   const id=Math.max(...state.kids.map(k=>k.id),-1)+1;
-  state.kids.push({id,name,emoji:emoji||'⭐',pin:pin||'0000',bedtime:'20:00',points:0,pointLog:[],loggedInAt:null,approvedAt:null,homeTime:null,tidyChecked:false,tidySigned:false});
-  renderTab(session.type,session.id);renderHome();saveState();notify(`✅ ${name} added!`);
+  const color=PROFILE_COLORS[id%PROFILE_COLORS.length];
+  state.kids.push({id,name,emoji:'⭐',pin:pin||'0000',bedtime:'20:00',points:0,pointLog:[],
+    loggedInAt:null,approvedAt:null,homeTime:null,tidyChecked:false,tidySigned:false,bgColor:color});
+  renderTab(session.type,session.id);renderHome();saveState();
+  notify(`✅ ${name} added! Open their profile to set an icon or photo.`);
 }
 function addStaffProfile(type){
   const name=prompt(`${type==='supervisor'?'Supervisor':'Parent'} name:`);if(!name)return;
   const pin=prompt('PIN:',type==='supervisor'?'5678':'1234');
-  const emoji=prompt('Emoji:',type==='supervisor'?'👁️':'👑');
   const id=`${type[0]}${Date.now()}`;
-  const obj={id,name,emoji:emoji||'👤',pin:pin||'0000',role:type};
+  const obj={id,name,emoji:type==='supervisor'?'👁️':'👑',pin:pin||'0000',role:type};
   if(type==='supervisor')state.supervisors.push(obj);else state.parents.push(obj);
   renderTab(session.type,session.id);renderHome();saveState();notify(`✅ ${name} added!`);
 }
-function setBedtime(kidId,val){getKid(kidId).bedtime=val;notify('🌙 Bedtime updated!','#7c3aed');}
+function setBedtime(kidId,val){getKid(kidId).bedtime=val;saveState();notify('🌙 Bedtime updated!','#7c3aed');}
 function openSettings(){if(session.type!=='parent'){notify('Parent login required!','#ef4444');return;}activeTab='settings';document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));renderTab(session.type,session.id);}
+
+// ═══ ADJUST POINTS ═══
+let _adjustKidId=null;
+function openAdjustPoints(kidId){
+  _adjustKidId=kidId;
+  const k=getKid(kidId);
+  document.getElementById('adjustPointsKidInfo').innerHTML=`${k.emoji} ${k.name} — <span style="color:#f59e0b">${k.points} ⭐ current</span>`;
+  document.getElementById('adjustPointsAmount').value='';
+  document.getElementById('adjustPointsReason').value='';
+  openModal('adjustPointsModal');
+}
+function saveAdjustPoints(){
+  const amount=parseInt(document.getElementById('adjustPointsAmount').value);
+  const reason=document.getElementById('adjustPointsReason').value.trim()||'Manual adjustment';
+  if(isNaN(amount)||amount===0){notify('Enter a non-zero amount','#ef4444');return;}
+  addPoints(_adjustKidId,amount,`✏️ ${reason}`);
+  closeModal('adjustPointsModal');
+  renderTab(session.type,session.id);saveState();
+}
+
+// ═══ RESET INDIVIDUAL CHORE ═══
+function resetChore(kidId,choreId){
+  if(!confirm('Reset this chore to unchecked?'))return;
+  setCS(kidId,choreId,{checked:false,checkedAt:null,signed:false,cancelled:false});
+  getKid(kidId).approvedAt=null;
+  renderTab(session.type,session.id);saveState();notify('↩️ Chore reset');
+}
+
+// ═══ DAILY HISTORY ═══
+function todayKey(){return new Date().toISOString().slice(0,10);}
+function archiveToday(){
+  const key=todayKey();
+  if(!state.history)state.history={};
+  if(!state.history[key])state.history[key]={};
+  state.kids.forEach(kid=>{
+    const chores=kidChores(kid.id);
+    state.history[key][kid.id]={kidName:kid.name,points:kid.points,chores:{}};
+    chores.forEach(c=>{
+      const cs=getCS(kid.id,c.id);
+      state.history[key][kid.id].chores[c.name]=cs.signed?'signed':cs.checked?'checked':cs.cancelled?'cancelled':'missed';
+    });
+  });
+}
+function midnightReset(){
+  archiveToday();
+  // Reset chore states only — keep points and leaderboard
+  state.choreState={};
+  state.kids.forEach(k=>{
+    k.loggedInAt=null;k.approvedAt=null;k.homeTime=null;
+    k.tidyChecked=false;k.tidySigned=false;
+    // Points carry over — NOT reset
+  });
+  saveState();notify('🌅 New day! Chores reset.','#0ea5e9');
+  if(session.type)renderTab(session.type,session.id);
+}
+function scheduleMidnightReset(){
+  const now=new Date(),midnight=new Date(now);
+  midnight.setHours(24,0,0,0);
+  setTimeout(()=>{midnightReset();scheduleMidnightReset();},midnight-now);
+}
+function openHistoryModal(){
+  const sel=document.getElementById('historyKidSel');
+  sel.innerHTML='<option value="all">All Kids</option>'+state.kids.map(k=>`<option value="${k.id}">${k.emoji} ${k.name}</option>`).join('');
+  document.getElementById('historyDateSel').value=todayKey();
+  renderHistoryModal();openModal('historyModal');
+}
+function renderHistoryModal(){
+  const kidFilter=document.getElementById('historyKidSel').value;
+  const date=document.getElementById('historyDateSel').value;
+  const content=document.getElementById('historyModalContent');
+  if(!state.history||!state.history[date]){
+    content.innerHTML='<div style="color:var(--muted);text-align:center;padding:20px;font-weight:700">No history for this date yet</div>';return;
+  }
+  const statusIcon={signed:'✅',checked:'⏳',cancelled:'🚫',missed:'◻️'};
+  const kids=kidFilter==='all'?state.kids:state.kids.filter(k=>k.id==kidFilter);
+  content.innerHTML=kids.map(kid=>{
+    const d=state.history[date][kid.id];if(!d)return'';
+    const i=kid.id<KC.length?kid.id:0;
+    return`<div class="card" style="margin-bottom:10px;border-color:${KBD[i]}">
+      <div style="font-weight:800;color:${KC[i]};margin-bottom:8px">${kid.emoji} ${kid.name} · ${d.points??0} ⭐</div>
+      ${Object.entries(d.chores||{}).map(([name,status])=>`
+        <div style="display:flex;gap:8px;align-items:center;padding:4px 0;font-size:.85rem;border-bottom:1px solid var(--border)">
+          <span>${statusIcon[status]||'◻️'}</span><span style="flex:1">${name}</span>
+          <span style="font-size:.75rem;color:var(--muted);font-weight:700">${status}</span>
+        </div>`).join('')}
+    </div>`;
+  }).join('')||'<div style="color:var(--muted);text-align:center;padding:20px">No data for selected kid</div>';
+}
+
+// ═══ FULL DATABASE WIPE ═══
+function fullDatabaseWipe(){
+  if(!confirm('⚠️ WIPE ALL DATA?\n\nResets points, chore history, reward requests.\nProfiles and high scores are kept.\nThis cannot be undone.'))return;
+  state.kids.forEach(k=>{k.points=0;k.pointLog=[];k.loggedInAt=null;k.approvedAt=null;k.homeTime=null;k.tidyChecked=false;k.tidySigned=false;});
+  state.choreState={};
+  state.rewardRequests=[];
+  state.history={};
+  // leaderboard intentionally preserved
+  saveState();renderTab(session.type,session.id);
+  notify('🗑️ Data wiped — profiles and scores kept!','#ef4444');
+}
 
 // ═══ EMOJI PICKER ═══
 const EMOJI_SET=[
@@ -1865,8 +2190,14 @@ function filterEmojis(val){renderEmojiGrid(val);}
 function selectEmoji(e){
   if(!_emojiTargetId)return;
   document.getElementById(_emojiTargetId).value=e;
-  // Update preview if it's the profile edit modal
-  if(_emojiTargetId==='pe-emoji') document.getElementById('peAvatarPreview').textContent=e;
+  if(_emojiTargetId==='pe-emoji'){
+    const preview=document.getElementById('peAvatarPreview');
+    preview.textContent=e;
+    preview.style.fontSize='2.8rem';
+    preview.style.backgroundImage='';
+    // Clear photo since emoji chosen
+    document.getElementById('pe-photo').value='';
+  }
   if(_emojiTargetId==='rw-icon-val'&&document.getElementById('rw-icon-preview')) document.getElementById('rw-icon-preview').textContent=e;
   closeModal('emojiModal');
 }
@@ -1917,8 +2248,11 @@ function hydrateState(saved){
   if(!saved.rewardRequests)  saved.rewardRequests=[];
   if(!saved.gameDifficulty)  saved.gameDifficulty={pong:'medium',snake:'medium',breakout:'medium',space:'medium',dino:'medium'};
   if(!saved.leaderboard)     saved.leaderboard={pong:[],snake:[],breakout:[],space:[],dino:[]};
+  if(!saved.history)         saved.history={};
   // Fix any chores missing days or kids arrays (old data)
   if(saved.chores) saved.chores.forEach(c=>{ if(!c.days) c.days=[]; if(!c.kids) c.kids=[]; });
+  // Fix kids missing new fields
+  if(saved.kids) saved.kids.forEach(k=>{ if(!k.bgColor) k.bgColor=KC[k.id%KC.length]; });
   return saved;
 }
 
@@ -2093,7 +2427,8 @@ function showIOSHint(){
 // ═══ INIT ═══
 renderHome();
 showIOSHint();
-tryAutoConnect();  // Connect to Firebase (or show setup screen)
+tryAutoConnect();
+scheduleMidnightReset();
 setInterval(()=>{if(session.type==='kid'&&activeTab==='chores')renderTab('kid',session.id);},60000);
 
 // Register Service Worker
