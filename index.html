@@ -588,11 +588,15 @@ const KB=['rgba(255,61,110,.08)','rgba(0,184,150,.08)','rgba(255,122,0,.08)','rg
 const KBD=['#ffc5d2','#a7f3e0','#ffd8b0','#ddd6fe'];
 
 const GAME_DEFS=[
-  {id:'pong',     name:'Ping Pong', icon:'🏓', color:'#ff3d6e', cost:1, winScore:5,  desc:'Beat CPU to 5'},
-  {id:'snake',    name:'Snake',     icon:'🐍', color:'#10b981', cost:1, winScore:10, desc:'Eat 10 apples'},
-  {id:'breakout', name:'Breakout',  icon:'🧱', color:'#f59e0b', cost:1, winScore:0,  desc:'Clear all bricks'},
-  {id:'space',    name:'Invaders',  icon:'🚀', color:'#0ea5e9', cost:1, winScore:0,  desc:'Defeat all aliens'},
-  {id:'dino',     name:'Dino Run',  icon:'🦕', color:'#ff7a00', cost:1, winScore:20, desc:'Survive 20 obstacles'},
+  {id:'pong',      name:'Ping Pong',    icon:'🏓', color:'#ff3d6e', cost:1, winScore:5,  eduWin:3, desc:'Beat CPU to 5'},
+  {id:'snake',     name:'Snake',        icon:'🐍', color:'#10b981', cost:1, winScore:10, eduWin:3, desc:'Eat 10 apples'},
+  {id:'breakout',  name:'Breakout',     icon:'🧱', color:'#f59e0b', cost:1, winScore:0,  eduWin:3, desc:'Clear all bricks'},
+  {id:'space',     name:'Invaders',     icon:'🚀', color:'#0ea5e9', cost:1, winScore:0,  eduWin:3, desc:'Defeat all aliens'},
+  {id:'dino',      name:'Dino Run',     icon:'🦕', color:'#ff7a00', cost:1, winScore:20, eduWin:3, desc:'Survive 20 obstacles'},
+  {id:'mathblast', name:'Math Blaster', icon:'🧮', color:'#ec4899', cost:1, winScore:10, eduWin:3, desc:'Solve 10 equations', edu:true},
+  {id:'memory',    name:'Memory Matrix',icon:'🧠', color:'#8b5cf6', cost:1, winScore:8,  eduWin:3, desc:'Remember the pattern', edu:true},
+  {id:'oddoneout', name:'Odd One Out',  icon:'🔍', color:'#14b8a6', cost:1, winScore:8,  eduWin:3, desc:'Find what doesn\'t belong', edu:true},
+  {id:'quiz',      name:'Quiz Blitz',   icon:'❓', color:'#f97316', cost:1, winScore:8,  eduWin:3, desc:'Answer trivia questions', edu:true},
 ];
 
 let state={
@@ -630,10 +634,11 @@ let state={
   todos:{}, // { userId: [{id, text, done, createdAt}] }
   dayBoard:[], // [{id, text, authorName, authorEmoji, pinned, time}] — parent/supervisor daily messages for kids
   needsList:[], // [{id, text, addedBy, addedByEmoji, done, time}] — shopping/needs requests
-  gameWinScore:{pong:5,snake:10,breakout:0,space:0,dino:20}, // 0 = clear all
-  dinoJumpPts:1, // points earned per obstacle cleared in dino
+  gameWinScore:{pong:5,snake:10,breakout:0,space:0,dino:20,mathblast:10,memory:8,oddoneout:8,quiz:8},
+  dinoJumpPts:1,
+  quizQuestions:[], // [{q, options:[4], answer:0-3, category}] — parent-added custom questions
   // difficulty per game: easy|medium|hard
-  gameDifficulty:{pong:'medium',snake:'medium',breakout:'medium',space:'medium',dino:'medium'},
+  gameDifficulty:{pong:'medium',snake:'medium',breakout:'medium',space:'medium',dino:'medium',mathblast:'medium',memory:'medium',oddoneout:'medium',quiz:'medium'},
   // leaderboard: { gameId: [ {name, emoji, score, kidId} ] }  (top 5 per game)
   leaderboard:{pong:[],snake:[],breakout:[],space:[],dino:[]},
 };
@@ -1004,14 +1009,17 @@ function renderArcadeMenu(kidId){
     const diff=getDiff(g.id);
     const diffCls=diff==='easy'?'diff-easy':diff==='hard'?'diff-hard':'diff-medium';
     const diffLabel=diff.charAt(0).toUpperCase()+diff.slice(1);
+    const costLine=g.edu?'1 ⭐ to play · Win = +3 ⭐':'1 ⭐ to play · Win = +2 ⭐';
+    const eduBadge=g.edu?'<div style="font-size:.65rem;font-weight:800;background:#fef3c7;color:#92400e;border-radius:6px;padding:1px 6px;margin-top:3px;display:inline-block">🧠 Brain Game</div>':'';
     return`<div class="arcade-game-card" style="--gc:${g.color}" onclick="launchGame('${g.id}',${kidId})">
       <div class="agc-icon">${g.icon}</div>
       <div class="agc-name">${g.name}</div>
-      <div class="agc-cost">1 ⭐ to play · Win = +2 ⭐</div>
-      <div class="agc-diff ${diffCls}">${diffLabel}</div>
+      <div class="agc-cost">${costLine}</div>
+      ${eduBadge}
+      <div class="agc-diff ${diffCls}" style="margin-top:4px">${diffLabel}</div>
     </div>`;}).join('');
   return`<h2 class="fredoka" style="margin-bottom:4px">🎮 Arcade</h2>
-    <p style="color:var(--muted);font-size:.82rem;font-weight:700;margin-bottom:14px">Spend 1 ⭐ to play · Beat the game = +2 ⭐ back · ${kid.emoji} ${kid.name} has <strong>${kid.points} ⭐</strong></p>
+    <p style="color:var(--muted);font-size:.82rem;font-weight:700;margin-bottom:14px">Spend 1 ⭐ to play · Beat the game = earn ⭐ back · ${kid.emoji} ${kid.name} has <strong>${kid.points} ⭐</strong></p>
     ${kid.points<1?'<div class="card" style="background:#fee2e2;border-color:#fecaca;color:#991b1b;font-weight:800;text-align:center;padding:16px">Not enough points to play! Earn more by doing chores! 💪</div>':''}
     <div class="arcade-menu">${cards}</div>`;
 }
@@ -1065,6 +1073,18 @@ function buildArcadeScreen(gameId,kidId){
   const kid=getKid(kidId);
   const g=GAME_DEFS.find(x=>x.id===gameId);
   const wrap=document.getElementById('arcadeWrap');
+  if(EDU_GAMES.includes(gameId)){
+    // Edu games use a full DOM UI — no canvas
+    wrap.innerHTML=`
+      <div class="arcade-header">
+        <button class="btn btn-outline btn-sm" onclick="exitGame()">← Back</button>
+        <h2>${g.icon} ${g.name}</h2>
+        <div class="arcade-pts-badge" id="arcadePtsBadge">${kid.emoji} ${kid.name} · ${kid.points} ⭐</div>
+      </div>
+      <div id="eduGame" style="flex:1;display:flex;flex-direction:column;padding:12px;gap:10px;overflow-y:auto"></div>`;
+    setTimeout(()=>initGame(gameId),60);
+    return;
+  }
   wrap.innerHTML=`
     <div class="arcade-header">
       <button class="btn btn-outline btn-sm" onclick="exitGame()">← Back</button>
@@ -1083,8 +1103,6 @@ function buildArcadeScreen(gameId,kidId){
     </div>
     <div class="mobile-controls" id="mobileControls"></div>
     <div class="desktop-hint" id="desktopHint"></div>`;
-
-  // Size canvas
   setTimeout(()=>{
     const cv=document.getElementById('gameCanvas');
     const maxW=Math.min(560,wrap.offsetWidth-4);
@@ -1116,6 +1134,7 @@ function startCurrentGame(){
   gameRAF=requestAnimationFrame(gameLoop);
 }
 
+const EDU_GAMES=['mathblast','memory','oddoneout','quiz'];
 function gameLoop(){
   if(!gameRunning)return;
   const cv=document.getElementById('gameCanvas');
@@ -1125,7 +1144,9 @@ function gameLoop(){
   else if(currentGameId==='breakout')updateBreakout();
   else if(currentGameId==='space')updateSpace();
   else if(currentGameId==='dino')updateDino();
-  gameRAF=requestAnimationFrame(gameLoop);
+  // edu games are event-driven, no rAF needed
+  if(!EDU_GAMES.includes(currentGameId))
+    gameRAF=requestAnimationFrame(gameLoop);
 }
 
 function initGame(id){
@@ -1134,6 +1155,10 @@ function initGame(id){
   else if(id==='breakout')initBreakout();
   else if(id==='space')initSpace();
   else if(id==='dino')initDino();
+  else if(id==='mathblast')initMathBlast();
+  else if(id==='memory')initMemoryMatrix();
+  else if(id==='oddoneout')initOddOneOut();
+  else if(id==='quiz')initQuizBlitz();
 }
 
 function showOverlay(icon,title,msg,btnTxt,btnFn){
@@ -1154,14 +1179,30 @@ function setScoreBar(items){
 function onGameWin(score){
   stopCurrentGame();
   const kid=getKid(currentGameKidId);const g=GAME_DEFS.find(x=>x.id===currentGameId);
-  kid.points+=2;
-  kid.pointLog.unshift({amount:2,reason:`🎮 Won ${g.name}! Score: ${score}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+  const reward=g.edu?3:2;
+  kid.points+=reward;
+  kid.pointLog.unshift({amount:reward,reason:`${g.edu?'🧠':'🎮'} Won ${g.name}! Score: ${score}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
   updateLeaderboard(currentGameId,currentGameKidId,score);
-  document.getElementById('arcadePtsBadge').textContent=`${kid.emoji} ${kid.name} · ${kid.points} ⭐`;
-  confetti();
-  showOverlay('🎉','You Won!',`+2 ⭐ earned! Score: ${score}`,'Play Again 🔄',()=>{
+  const badge=document.getElementById('arcadePtsBadge');
+  if(badge)badge.textContent=`${kid.emoji} ${kid.name} · ${kid.points} ⭐`;
+  confetti();saveState();
+  if(EDU_GAMES.includes(currentGameId)){
+    // Edu games show result in their own UI div
+    const el=document.getElementById('eduGame');
+    if(el)el.innerHTML=`<div style="text-align:center;padding:40px 20px">
+      <div style="font-size:4rem;margin-bottom:12px">🎉</div>
+      <div style="font-family:'Fredoka One',cursive;font-size:2rem;color:#10b981;margin-bottom:8px">You Won!</div>
+      <div style="font-size:1.1rem;font-weight:800;margin-bottom:20px">+${reward} ⭐ earned! Score: ${score}</div>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="eduPlayAgain()">Play Again (1 ⭐)</button>
+        <button class="btn btn-outline" onclick="exitGame()">← Back</button>
+      </div>
+    </div>`;
+    return;
+  }
+  showOverlay('🎉','You Won!',`+${reward} ⭐ earned! Score: ${score}`,'Play Again 🔄',()=>{
     const kid2=getKid(currentGameKidId);
-    if(kid2.points<1){showOverlay('😢','No Points',`Earn more by doing chores!`,'Go Back',exitGame);return;}
+    if(kid2.points<1){showOverlay('😢','No Points','Earn more by doing chores!','Go Back',exitGame);return;}
     kid2.points=Math.max(0,kid2.points-1);
     kid2.pointLog.unshift({amount:-1,reason:`🎮 Played ${g.name}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
     document.getElementById('arcadePtsBadge').textContent=`${kid2.emoji} ${kid2.name} · ${kid2.points} ⭐`;
@@ -1173,6 +1214,19 @@ function onGameLose(score){
   stopCurrentGame();
   const g=GAME_DEFS.find(x=>x.id===currentGameId);
   updateLeaderboard(currentGameId,currentGameKidId,score);
+  if(EDU_GAMES.includes(currentGameId)){
+    const el=document.getElementById('eduGame');
+    if(el)el.innerHTML=`<div style="text-align:center;padding:40px 20px">
+      <div style="font-size:4rem;margin-bottom:12px">😢</div>
+      <div style="font-family:'Fredoka One',cursive;font-size:2rem;color:#ef4444;margin-bottom:8px">Game Over!</div>
+      <div style="font-size:1rem;font-weight:800;color:var(--muted);margin-bottom:20px">Score: ${score} · Keep practising!</div>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="eduPlayAgain()">Try Again (1 ⭐)</button>
+        <button class="btn btn-outline" onclick="exitGame()">← Back</button>
+      </div>
+    </div>`;
+    saveState();return;
+  }
   showOverlay('😢','Game Over!',`Score: ${score} · Point was used. Try again?`,'Try Again (1 ⭐)',()=>{
     const kid=getKid(currentGameKidId);
     if(kid.points<1){showOverlay('😢','No Points','Earn more by doing chores!','Go Back',exitGame);return;}
@@ -1181,6 +1235,18 @@ function onGameLose(score){
     document.getElementById('arcadePtsBadge').textContent=`${getKid(currentGameKidId).emoji} ${getKid(currentGameKidId).name} · ${getKid(currentGameKidId).points} ⭐`;
     initGame(currentGameId);startCurrentGame();
   });
+}
+function eduPlayAgain(){
+  const kid=getKid(currentGameKidId);
+  const g=GAME_DEFS.find(x=>x.id===currentGameId);
+  if(!kid||kid.points<1){
+    document.getElementById('eduGame').innerHTML=`<div style="text-align:center;padding:40px">😢 Not enough points! Do your chores first.<br><button class="btn btn-outline" style="margin-top:16px" onclick="exitGame()">← Back</button></div>`;
+    return;
+  }
+  kid.points=Math.max(0,kid.points-1);
+  kid.pointLog.unshift({amount:-1,reason:`🧠 Played ${g.name}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+  document.getElementById('arcadePtsBadge').textContent=`${kid.emoji} ${kid.name} · ${kid.points} ⭐`;
+  saveState();initGame(currentGameId);
 }
 
 function getCanvas(){return document.getElementById('gameCanvas');}
@@ -1996,9 +2062,10 @@ function renderSettings(){
         <input type="number" min="0" max="5" value="${state.dinoJumpPts??1}" onchange="state.dinoJumpPts=parseInt(this.value)||0;saveState();notify('🦕 Jump points set!');"
           style="width:46px;padding:4px 6px;border-radius:8px;border:2px solid var(--border);background:var(--surface2);color:var(--text);font-weight:800;text-align:center;font-size:.82rem">
       </div>`:'';
+    const eduBadge=g.edu?'<span style="font-size:.65rem;font-weight:800;background:#fef3c7;color:#92400e;border-radius:6px;padding:1px 6px;margin-left:6px">🧠 +3 ⭐</span>':'';
     return`<div class="bedtime-row" style="flex-wrap:wrap">
       <div style="font-size:1.5rem">${g.icon}</div>
-      <div style="flex:1"><div style="font-weight:800">${g.name}</div><div style="font-size:.72rem;color:var(--muted)">Win score: ${winLabel}</div>${dinoExtra}</div>
+      <div style="flex:1"><div style="font-weight:800">${g.name}${eduBadge}</div><div style="font-size:.72rem;color:var(--muted)">Win score: ${winLabel}</div>${dinoExtra}</div>
       <div style="display:flex;gap:6px;align-items:center">
         ${winInput}
         <select class="diff-sel" onchange="setDifficulty('${g.id}',this.value)">
@@ -2010,11 +2077,41 @@ function renderSettings(){
       </div>
     </div>`;
   }).join('');
+
+  // Quiz Blitz custom questions
+  const qList=(state.quizQuestions||[]).map((q,i)=>`
+    <div class="bedtime-row" style="flex-wrap:wrap;gap:6px">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:800;font-size:.85rem">${q.q}</div>
+        <div style="font-size:.72rem;color:var(--muted)">${q.options.map((o,oi)=>oi===q.answer?`<strong style="color:#10b981">✓${o}</strong>`:o).join(' · ')} ${q.cat?`· ${q.cat}`:''}</div>
+      </div>
+      <button class="btn btn-red btn-sm" onclick="deleteQuizQ(${i})">🗑️</button>
+    </div>`).join('');
+  const quizManager=`
+    <div class="setting-card" style="grid-column:1/-1">
+      <h3>❓ Quiz Blitz Custom Questions</h3>
+      <p style="font-size:.8rem;color:var(--muted);font-weight:700;margin-bottom:12px">Add your own questions — school subjects, family trivia, anything! These mix in with the built-in questions.</p>
+      ${qList||'<div style="color:var(--muted);font-size:.82rem;font-weight:700;margin-bottom:12px">No custom questions yet — add one below!</div>'}
+      <div style="background:var(--surface2);border-radius:14px;padding:14px;margin-top:10px;display:flex;flex-direction:column;gap:8px">
+        <input id="qzQ" placeholder="Question text" style="padding:8px 12px;border-radius:10px;border:2px solid var(--border);background:var(--bg);color:var(--text);font-weight:700;font-size:.85rem;width:100%;box-sizing:border-box">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <input id="qzA" placeholder="Option A ✓ (correct)" style="padding:8px 12px;border-radius:10px;border:2px solid #10b981;background:var(--bg);color:var(--text);font-weight:700;font-size:.82rem">
+          <input id="qzB" placeholder="Option B" style="padding:8px 12px;border-radius:10px;border:2px solid var(--border);background:var(--bg);color:var(--text);font-weight:700;font-size:.82rem">
+          <input id="qzC" placeholder="Option C" style="padding:8px 12px;border-radius:10px;border:2px solid var(--border);background:var(--bg);color:var(--text);font-weight:700;font-size:.82rem">
+          <input id="qzD" placeholder="Option D" style="padding:8px 12px;border-radius:10px;border:2px solid var(--border);background:var(--bg);color:var(--text);font-weight:700;font-size:.82rem">
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="qzCat" placeholder="Category (e.g. 📚 Math)" style="flex:1;padding:8px 12px;border-radius:10px;border:2px solid var(--border);background:var(--bg);color:var(--text);font-weight:700;font-size:.82rem">
+          <button class="btn btn-primary btn-sm" onclick="addQuizQ()">➕ Add Question</button>
+        </div>
+      </div>
+    </div>`;
   c.innerHTML=`<div class="settings-grid">
     <div class="setting-card"><h3>👦 Kid Profiles</h3>${kidCards}<button class="btn btn-primary btn-sm" style="margin-top:9px" onclick="addKidProfile()">➕ Add Kid</button></div>
     <div class="setting-card"><h3>👁️ Supervisors</h3>${supCards}<button class="btn btn-outline btn-sm" style="margin-top:7px" onclick="addStaffProfile('supervisor')">➕ Supervisor</button><h3 style="margin-top:14px">👑 Parents</h3>${parCards}<button class="btn btn-outline btn-sm" style="margin-top:7px" onclick="addStaffProfile('parent')">➕ Parent</button></div>
     <div class="setting-card"><h3>📋 Chores</h3>${choreList}<button class="btn btn-primary btn-sm" style="margin-top:9px" onclick="addChoreOpen()">➕ Add Chore</button></div>
-    <div class="setting-card" style="grid-column:1/-1"><h3>🎮 Games</h3><p style="font-size:.8rem;color:var(--muted);margin-bottom:12px;font-weight:700">Set difficulty and win score per game. 🗑️ resets that game's high scores only.</p>${diffRows}<button class="btn btn-red btn-sm" style="margin-top:12px" onclick="clearLeaderboard()">🗑️ Clear ALL Scores</button></div>
+    <div class="setting-card" style="grid-column:1/-1"><h3>🎮 Games</h3><p style="font-size:.8rem;color:var(--muted);margin-bottom:12px;font-weight:700">Set difficulty and win score per game. 🗑️ resets that game's high scores only. 🧠 Brain Games give +3 ⭐ on win!</p>${diffRows}<button class="btn btn-red btn-sm" style="margin-top:12px" onclick="clearLeaderboard()">🗑️ Clear ALL Scores</button></div>
+    ${quizManager}
     <div class="setting-card" style="grid-column:1/-1"><h3>🔥 Sync Status</h3>
       <p style="font-size:.85rem;font-weight:700;margin-bottom:8px">Firebase: ${fbConfigured?'<span style="color:#10b981">✅ Connected — all devices are synced</span>':'<span style="color:#ef4444">❌ Not connected — running on local data only</span>'}</p>
       <p style="font-size:.78rem;color:var(--muted);font-weight:700;margin-bottom:12px">Config is fetched automatically from your Cloudflare Worker.</p>
@@ -2032,11 +2129,26 @@ function setWinScore(gameId,val){
   const n=parseInt(val);if(isNaN(n)||n<1)return;
   if(!state.gameWinScore)state.gameWinScore={};
   state.gameWinScore[gameId]=n;
-  // Update the GAME_DEFS live so games use it immediately
   const gd=GAME_DEFS.find(g=>g.id===gameId);
   if(gd)gd.winScore=n;
   saveState();notify(`${gd?.icon||''} Win score set to ${n}!`,'#7c3aed');
   renderSettings();
+}
+function addQuizQ(){
+  const q=document.getElementById('qzQ')?.value.trim();
+  const a=document.getElementById('qzA')?.value.trim();
+  const b=document.getElementById('qzB')?.value.trim();
+  const cc=document.getElementById('qzC')?.value.trim();
+  const d=document.getElementById('qzD')?.value.trim();
+  const cat=document.getElementById('qzCat')?.value.trim();
+  if(!q||!a||!b||!cc||!d){notify('Fill in the question and all 4 options!','#ef4444');return;}
+  if(!state.quizQuestions)state.quizQuestions=[];
+  state.quizQuestions.push({q,options:[a,b,cc,d],answer:0,cat:cat||'❓ Custom'});
+  saveState();renderSettings();notify('❓ Question added to Quiz Blitz!','#f97316');
+}
+function deleteQuizQ(idx){
+  if(!confirm('Delete this question?'))return;
+  state.quizQuestions.splice(idx,1);saveState();renderSettings();notify('Question deleted');
 }
 function clearGameScore(gameId){
   const g=GAME_DEFS.find(x=>x.id===gameId);
@@ -2054,11 +2166,13 @@ function renderStaffArcadeMenu(type,userId){
   const cards=GAME_DEFS.map(g=>{
     const diff=getDiff(g.id);
     const diffCls=diff==='easy'?'diff-easy':diff==='hard'?'diff-hard':'diff-medium';
+    const eduBadge=g.edu?'<div style="font-size:.65rem;font-weight:800;background:#fef3c7;color:#92400e;border-radius:6px;padding:1px 6px;margin-top:3px;display:inline-block">🧠 Brain Game</div>':'';
     return`<div class="arcade-game-card" style="--gc:${g.color}" onclick="launchStaffGame('${g.id}','${userId}','${type}')">
       <div class="agc-icon">${g.icon}</div>
       <div class="agc-name">${g.name}</div>
       <div class="agc-cost">Free to play · On leaderboard</div>
-      <div class="agc-diff ${diffCls}">${diff}</div>
+      ${eduBadge}
+      <div class="agc-diff ${diffCls}" style="margin-top:4px">${diff}</div>
     </div>`;
   }).join('');
   return`<h2 class="fredoka" style="margin-bottom:4px">🎮 Arcade</h2>
@@ -2079,6 +2193,17 @@ function launchStaffGame(gameId,userId,type){
 function buildStaffArcadeScreen(gameId,profile){
   const g=GAME_DEFS.find(x=>x.id===gameId);
   const wrap=document.getElementById('arcadeWrap');
+  if(EDU_GAMES.includes(gameId)){
+    wrap.innerHTML=`
+      <div class="arcade-header">
+        <button class="btn btn-outline btn-sm" onclick="exitGame()">← Back</button>
+        <h2>${g.icon} ${g.name}</h2>
+        <div class="arcade-pts-badge" id="arcadePtsBadge">${profile.emoji} ${profile.name}</div>
+      </div>
+      <div id="eduGame" style="flex:1;display:flex;flex-direction:column;padding:12px;gap:10px;overflow-y:auto"></div>`;
+    setTimeout(()=>initGame(gameId),60);
+    return;
+  }
   wrap.innerHTML=`
     <div class="arcade-header">
       <button class="btn btn-outline btn-sm" onclick="exitGame()">← Back</button>
@@ -2113,6 +2238,19 @@ function onGameWin(score){
     stopCurrentGame();
     updateStaffLeaderboard(currentGameId,currentGameKidId,score);
     confetti();
+    if(EDU_GAMES.includes(currentGameId)){
+      const el=document.getElementById('eduGame');
+      if(el)el.innerHTML=`<div style="text-align:center;padding:40px 20px">
+        <div style="font-size:4rem;margin-bottom:12px">🎉</div>
+        <div style="font-family:'Fredoka One',cursive;font-size:2rem;color:#10b981;margin-bottom:8px">You Won!</div>
+        <div style="font-size:1rem;color:var(--muted);font-weight:800;margin-bottom:20px">Score: ${score} (staff — no points)</div>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="initGame(currentGameId)">Play Again</button>
+          <button class="btn btn-outline" onclick="exitGame()">← Back</button>
+        </div>
+      </div>`;
+      return;
+    }
     showOverlay('🎉','You Won!',`Score: ${score}`,'Play Again 🔄',()=>{initGame(currentGameId);startCurrentGame();});
     return;
   }
@@ -2122,10 +2260,24 @@ function onGameLose(score){
   if(String(currentGameKidId).startsWith('staff_')){
     stopCurrentGame();
     updateStaffLeaderboard(currentGameId,currentGameKidId,score);
+    if(EDU_GAMES.includes(currentGameId)){
+      const el=document.getElementById('eduGame');
+      if(el)el.innerHTML=`<div style="text-align:center;padding:40px 20px">
+        <div style="font-size:4rem;margin-bottom:12px">😢</div>
+        <div style="font-family:'Fredoka One',cursive;font-size:2rem;color:#ef4444;margin-bottom:8px">Game Over!</div>
+        <div style="font-size:1rem;color:var(--muted);font-weight:800;margin-bottom:20px">Score: ${score}</div>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="initGame(currentGameId)">Try Again</button>
+          <button class="btn btn-outline" onclick="exitGame()">← Back</button>
+        </div>
+      </div>`;
+      return;
+    }
     showOverlay('😢','Game Over!',`Score: ${score}`,'Try Again',()=>{initGame(currentGameId);startCurrentGame();});
     return;
   }
   _origOnGameLose(score);
+}
 }
 
 function updateStaffLeaderboard(gameId,staffKey,score){
@@ -2142,7 +2294,348 @@ function updateStaffLeaderboard(gameId,staffKey,score){
   if(lb[0].kidId===staffKey) notify(`🏆 ${profile.name} has the new high score!`,'#f59e0b');
 }
 
-// ═══ TO-DO LIST ═══
+// ══════════════════════════════════════════════════════════════
+// EDUCATIONAL GAMES — DOM-based, no canvas, +3 ⭐ on win
+// ══════════════════════════════════════════════════════════════
+
+// ── Shared helpers ──
+function eduEl(){return document.getElementById('eduGame');}
+function eduScoreHtml(score,target,streak){
+  return`<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:4px">
+    <div style="background:var(--surface2);border-radius:12px;padding:8px 18px;font-weight:800;font-size:1rem">✅ ${score} / ${target}</div>
+    ${streak>1?`<div style="background:#fef3c7;border-radius:12px;padding:8px 18px;font-weight:800;font-size:1rem;color:#92400e">🔥 ${streak} streak!</div>`:''}
+  </div>`;
+}
+
+// ─────────────────── MATH BLASTER 🧮 ───────────────────
+const MATH_OPS=['+','-','×','÷'];
+function mathQuestion(diff){
+  const op=MATH_OPS[Math.floor(Math.random()*( diff==='easy'?2:diff==='hard'?4:3))];
+  let a,b,ans;
+  if(op==='+'){a=r(diff,1,20);b=r(diff,1,20);ans=a+b;}
+  else if(op==='-'){a=r(diff,5,30);b=r(diff,1,a);ans=a-b;}
+  else if(op==='×'){a=r(diff,2,diff==='easy'?5:12);b=r(diff,2,diff==='easy'?5:10);ans=a*b;}
+  else{a=r(diff,1,10);b=r(diff,1,a);a=a*b;ans=a/b;}
+  return{q:`${a} ${op} ${b} = ?`,ans};
+}
+function r(diff,lo,hi){
+  const scale=diff==='easy'?0.5:diff==='hard'?1:0.75;
+  return lo+Math.floor(Math.random()*(hi-lo+1)*scale+0.5);
+}
+function makeMathChoices(ans){
+  const s=new Set([ans]);
+  while(s.size<4){const d=Math.floor(Math.random()*11)-5;const c=ans+d;if(c!==ans&&c>=0)s.add(c);}
+  return [...s].sort(()=>Math.random()-0.5);
+}
+
+function initMathBlast(){
+  gameRunning=true;
+  const diff=getDiff('mathblast');
+  const target=state.gameWinScore?.mathblast??10;
+  gameState.mathblast={score:0,streak:0,target,diff};
+  renderMathBlast();
+}
+function renderMathBlast(){
+  const s=gameState.mathblast;
+  if(!s){return;}
+  const {q,ans}=mathQuestion(s.diff);
+  s._ans=ans;
+  const choices=makeMathChoices(ans);
+  const timeLimit=s.diff==='easy'?12:s.diff==='hard'?6:9;
+  // Clear any existing timer
+  if(s._timer)clearInterval(s._timer);
+  s._timeLeft=timeLimit;
+  const el=eduEl();if(!el)return;
+  el.innerHTML=`
+    <div style="text-align:center">
+      ${eduScoreHtml(s.score,s.target,s.streak)}
+      <div style="font-size:.8rem;color:var(--muted);font-weight:700;margin-bottom:8px">Solve ${s.target} to win! (+3 ⭐)</div>
+    </div>
+    <div style="background:linear-gradient(135deg,#ec4899,#f43f5e);border-radius:20px;padding:24px;text-align:center;margin:4px 0">
+      <div style="font-size:2.2rem;font-family:'Fredoka One',cursive;color:white;margin-bottom:4px">${q}</div>
+      <div id="mbTimer" style="font-size:1rem;color:rgba(255,255,255,.8);font-weight:800">${s._timeLeft}s</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px">
+      ${choices.map(c=>`<button class="btn" onclick="mathAnswer(${c})"
+        style="padding:18px;font-size:1.4rem;font-weight:800;border-radius:16px;
+          background:var(--surface2);border:3px solid var(--border);color:var(--text);
+          box-shadow:0 4px 0 var(--border);transition:all .1s">${c}</button>`).join('')}
+    </div>`;
+  s._timer=setInterval(()=>{
+    s._timeLeft--;
+    const t=document.getElementById('mbTimer');
+    if(t)t.textContent=s._timeLeft+'s';
+    if(s._timeLeft<=0){clearInterval(s._timer);mathAnswer(null);}
+  },1000);
+}
+function mathAnswer(chosen){
+  const s=gameState.mathblast;if(!s)return;
+  clearInterval(s._timer);
+  const correct=chosen===s._ans;
+  if(correct){s.score++;s.streak++;}else{s.streak=0;}
+  const el=eduEl();if(!el)return;
+  // Flash feedback
+  const flash=document.createElement('div');
+  flash.style.cssText=`position:fixed;inset:0;background:${correct?'rgba(16,185,129,.25)':'rgba(239,68,68,.25)'};z-index:999;pointer-events:none;transition:opacity .4s`;
+  document.body.appendChild(flash);setTimeout(()=>{flash.style.opacity='0';setTimeout(()=>flash.remove(),400)},100);
+  // Show correct answer briefly then next question
+  const btns=el.querySelectorAll('button');
+  btns.forEach(b=>{
+    if(parseInt(b.textContent)===s._ans)b.style.background='#10b981',b.style.color='white',b.style.border='3px solid #10b981';
+    else if(parseInt(b.textContent)===chosen&&!correct)b.style.background='#ef4444',b.style.color='white';
+    b.disabled=true;
+  });
+  setTimeout(()=>{
+    if(s.score>=s.target){onGameWin(s.score);return;}
+    renderMathBlast();
+  },correct?600:1200);
+}
+
+// ─────────────────── MEMORY MATRIX 🧠 ───────────────────
+function initMemoryMatrix(){
+  gameRunning=true;
+  const diff=getDiff('memory');
+  const target=state.gameWinScore?.memory??8;
+  const size=diff==='easy'?3:diff==='hard'?5:4; // grid dimension
+  gameState.memory={score:0,target,diff,size,level:1,phase:'show'};
+  renderMemoryRound();
+}
+function renderMemoryRound(){
+  const s=gameState.memory;if(!s)return;
+  const {size,level}=s;
+  const total=size*size;
+  const lit=Math.min(2+level,Math.floor(total*0.6));
+  // Pick random cells to light
+  const cells=[];while(cells.length<lit){const c=Math.floor(Math.random()*total);if(!cells.includes(c))cells.push(c);}
+  s._pattern=cells;s._selected=[];s.phase='show';
+  const showTime=Math.max(500,1800-(level*150));
+  const el=eduEl();if(!el)return;
+  el.innerHTML=`
+    <div style="text-align:center">
+      ${eduScoreHtml(s.score,s.target,0)}
+      <div style="font-size:.85rem;color:var(--muted);font-weight:700;margin-bottom:8px">Round ${level} · Watch the pattern!</div>
+    </div>
+    <div id="memGrid" style="display:grid;grid-template-columns:repeat(${size},1fr);gap:8px;max-width:320px;margin:0 auto"></div>
+    <div id="memMsg" style="text-align:center;margin-top:10px;font-weight:800;font-size:.9rem;color:var(--muted)">Memorise...</div>`;
+  const grid=document.getElementById('memGrid');
+  for(let i=0;i<total;i++){
+    const btn=document.createElement('button');
+    btn.dataset.idx=i;
+    const lit2=cells.includes(i);
+    btn.style.cssText=`width:100%;aspect-ratio:1;border-radius:12px;border:3px solid var(--border);
+      background:${lit2?'#8b5cf6':'var(--surface2)'};transition:all .2s;cursor:default;font-size:1.4rem`;
+    btn.textContent=lit2?'💜':'';
+    grid.appendChild(btn);
+  }
+  setTimeout(()=>{
+    // Hide pattern
+    grid.querySelectorAll('button').forEach(b=>{b.style.background='var(--surface2)';b.textContent='';b.style.cursor='pointer';b.onclick=()=>memTap(parseInt(b.dataset.idx));});
+    document.getElementById('memMsg').textContent='Now tap the lit cells!';
+    s.phase='input';
+  },showTime);
+}
+function memTap(idx){
+  const s=gameState.memory;if(!s||s.phase!=='input')return;
+  s._selected.push(idx);
+  const grid=document.getElementById('memGrid');
+  const btn=grid?.querySelector(`[data-idx="${idx}"]`);
+  if(btn){btn.style.background='#8b5cf6';btn.textContent='💜';btn.disabled=true;}
+  if(s._selected.length===s._pattern.length){
+    // Check
+    const correct=s._pattern.every(c=>s._selected.includes(c));
+    if(correct){
+      s.score++;s.level++;
+      if(s.score>=s.target){onGameWin(s.score);return;}
+      const msg=document.getElementById('memMsg');
+      if(msg)msg.innerHTML='<span style="color:#10b981;font-size:1.1rem">✅ Correct! Next round...</span>';
+      setTimeout(()=>renderMemoryRound(),1000);
+    } else {
+      // Show correct cells
+      grid.querySelectorAll('button').forEach(b=>{
+        const i=parseInt(b.dataset.idx);
+        if(s._pattern.includes(i)){b.style.background='#10b981';b.textContent='✅';}
+        else if(s._selected.includes(i)&&!s._pattern.includes(i)){b.style.background='#ef4444';b.textContent='❌';}
+        b.disabled=true;
+      });
+      document.getElementById('memMsg').innerHTML='<span style="color:#ef4444">❌ Wrong! Game Over</span>';
+      setTimeout(()=>onGameLose(s.score),1500);
+    }
+  }
+}
+
+// ─────────────────── ODD ONE OUT 🔍 ───────────────────
+const ODD_SETS=[
+  {cat:'🐾 Animals',items:['Dog','Cat','Fish','Hammer'],odd:'Hammer'},
+  {cat:'🍎 Fruits',items:['Apple','Banana','Carrot','Grape'],odd:'Carrot'},
+  {cat:'🔢 Numbers',items:['2','4','7','8'],odd:'7',hint:'not even'},
+  {cat:'🌍 Countries',items:['France','Germany','Sushi','Italy'],odd:'Sushi'},
+  {cat:'🎨 Colors',items:['Red','Blue','Tuesday','Green'],odd:'Tuesday'},
+  {cat:'🚗 Transport',items:['Car','Bus','Train','Mountain'],odd:'Mountain'},
+  {cat:'⚽ Sports',items:['Soccer','Tennis','Chess','Basketball'],odd:'Chess',hint:'not a physical sport'},
+  {cat:'🌡️ Weather',items:['Sunny','Rainy','Cloudy','Monday'],odd:'Monday'},
+  {cat:'🔢 Primes',items:['2','3','5','9'],odd:'9',hint:'not prime'},
+  {cat:'📚 School',items:['Math','Science','Recess','English'],odd:'Recess'},
+  {cat:'🍕 Food',items:['Pizza','Burger','Pencil','Taco'],odd:'Pencil'},
+  {cat:'🎵 Music',items:['Guitar','Piano','Violin','Hammer'],odd:'Hammer'},
+  {cat:'🔢 Squares',items:['4','9','16','14'],odd:'14',hint:'not a perfect square'},
+  {cat:'🌊 Ocean',items:['Shark','Whale','Eagle','Dolphin'],odd:'Eagle'},
+  {cat:'🏠 Furniture',items:['Chair','Table','Sofa','Apple'],odd:'Apple'},
+  {cat:'❄️ Cold things',items:['Snow','Ice','Fire','Frost'],odd:'Fire'},
+  {cat:'🔢 Multiples of 3',items:['6','9','10','12'],odd:'10'},
+  {cat:'🪐 Planets',items:['Mars','Venus','Moon','Jupiter'],odd:'Moon',hint:'not a planet'},
+  {cat:'👨‍🍳 Kitchen',items:['Spoon','Fork','Knife','Hammer'],odd:'Hammer'},
+  {cat:'🎭 Emotions',items:['Happy','Sad','Angry','Running'],odd:'Running'},
+];
+function initOddOneOut(){
+  gameRunning=true;
+  const diff=getDiff('oddoneout');
+  const target=state.gameWinScore?.oddoneout??8;
+  const pool=[...ODD_SETS].sort(()=>Math.random()-.5);
+  gameState.oddoneout={score:0,target,diff,pool,qi:0,streak:0};
+  renderOddOneOut();
+}
+function renderOddOneOut(){
+  const s=gameState.oddoneout;if(!s)return;
+  if(s.qi>=s.pool.length)s.qi=0; // loop if ran out
+  const round=s.pool[s.qi++];
+  s._odd=round.odd;
+  const shuffled=[...round.items].sort(()=>Math.random()-.5);
+  const timeLimit=s.diff==='easy'?15:s.diff==='hard'?7:10;
+  s._timeLeft=timeLimit;
+  if(s._timer)clearInterval(s._timer);
+  const el=eduEl();if(!el)return;
+  el.innerHTML=`
+    <div style="text-align:center">
+      ${eduScoreHtml(s.score,s.target,s.streak)}
+      <div style="font-size:.85rem;color:var(--muted);font-weight:700;margin-bottom:8px">Find what doesn't belong!</div>
+    </div>
+    <div style="background:linear-gradient(135deg,#14b8a6,#0891b2);border-radius:20px;padding:18px;text-align:center;margin:4px 0">
+      <div style="font-size:1.3rem;font-family:'Fredoka One',cursive;color:white">${round.cat}</div>
+      ${round.hint?`<div style="font-size:.8rem;color:rgba(255,255,255,.8);margin-top:4px">Hint: ${round.hint}</div>`:''}
+      <div id="oddTimer" style="font-size:.9rem;color:rgba(255,255,255,.8);font-weight:800;margin-top:6px">${timeLimit}s</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
+      ${shuffled.map(item=>`<button class="btn" onclick="oddAnswer('${item}')"
+        style="padding:18px 10px;font-size:1.1rem;font-weight:800;border-radius:16px;
+          background:var(--surface2);border:3px solid var(--border);color:var(--text);
+          box-shadow:0 4px 0 var(--border);transition:all .1s">${item}</button>`).join('')}
+    </div>`;
+  s._timer=setInterval(()=>{
+    s._timeLeft--;
+    const t=document.getElementById('oddTimer');
+    if(t)t.textContent=s._timeLeft+'s';
+    if(s._timeLeft<=0){clearInterval(s._timer);oddAnswer(null);}
+  },1000);
+}
+function oddAnswer(chosen){
+  const s=gameState.oddoneout;if(!s)return;
+  clearInterval(s._timer);
+  const correct=chosen===s._odd;
+  if(correct){s.score++;s.streak++;}else{s.streak=0;}
+  const el=eduEl();if(!el)return;
+  el.querySelectorAll('button').forEach(b=>{
+    if(b.textContent===s._odd)b.style.cssText+=';background:#10b981;color:white;border-color:#10b981';
+    else if(b.textContent===chosen&&!correct)b.style.cssText+=';background:#ef4444;color:white;border-color:#ef4444';
+    b.disabled=true;
+  });
+  const flash=document.createElement('div');
+  flash.style.cssText=`position:fixed;inset:0;background:${correct?'rgba(16,185,129,.25)':'rgba(239,68,68,.25)'};z-index:999;pointer-events:none`;
+  document.body.appendChild(flash);setTimeout(()=>flash.remove(),500);
+  setTimeout(()=>{
+    if(s.score>=s.target){onGameWin(s.score);return;}
+    renderOddOneOut();
+  },correct?600:1400);
+}
+
+// ─────────────────── QUIZ BLITZ ❓ ───────────────────
+const BUILT_IN_QUIZ=[
+  {q:'What is the capital of France?',options:['Paris','London','Rome','Berlin'],answer:0,cat:'🌍 Geography'},
+  {q:'How many sides does a hexagon have?',options:['5','6','7','8'],answer:1,cat:'🔢 Math'},
+  {q:'What planet is closest to the Sun?',options:['Venus','Earth','Mercury','Mars'],answer:2,cat:'🪐 Science'},
+  {q:'What is 7 × 8?',options:['54','56','63','48'],answer:1,cat:'🔢 Math'},
+  {q:'Which animal is the largest?',options:['Elephant','Blue Whale','Giraffe','Hippo'],answer:1,cat:'🐾 Animals'},
+  {q:'How many continents are there?',options:['5','6','7','8'],answer:2,cat:'🌍 Geography'},
+  {q:'What gas do plants breathe in?',options:['Oxygen','Nitrogen','Carbon Dioxide','Hydrogen'],answer:2,cat:'🔬 Science'},
+  {q:'What is 144 ÷ 12?',options:['11','12','13','14'],answer:1,cat:'🔢 Math'},
+  {q:'Which is the longest river in the world?',options:['Amazon','Mississippi','Nile','Yangtze'],answer:2,cat:'🌍 Geography'},
+  {q:'How many bones are in the human body?',options:['196','206','216','226'],answer:1,cat:'🔬 Science'},
+  {q:'What is the square root of 81?',options:['7','8','9','10'],answer:2,cat:'🔢 Math'},
+  {q:'Which ocean is the largest?',options:['Atlantic','Indian','Arctic','Pacific'],answer:3,cat:'🌍 Geography'},
+  {q:'What is the chemical symbol for water?',options:['WA','H2O','HO','H2'],answer:1,cat:'🔬 Science'},
+  {q:'How many days in a leap year?',options:['364','365','366','367'],answer:2,cat:'🔢 Math'},
+  {q:'What is the fastest land animal?',options:['Lion','Cheetah','Horse','Leopard'],answer:1,cat:'🐾 Animals'},
+  {q:'How many players on a soccer team?',options:['9','10','11','12'],answer:2,cat:'⚽ Sports'},
+  {q:'What is 15% of 200?',options:['20','25','30','35'],answer:2,cat:'🔢 Math'},
+  {q:'Which planet has rings?',options:['Jupiter','Mars','Saturn','Uranus'],answer:2,cat:'🪐 Science'},
+  {q:'What color is the sky on a clear day?',options:['Green','Blue','White','Gray'],answer:1,cat:'🔬 Science'},
+  {q:'How many seconds in one minute?',options:['30','45','60','90'],answer:2,cat:'🔢 Math'},
+];
+function initQuizBlitz(){
+  gameRunning=true;
+  const diff=getDiff('quiz');
+  const target=state.gameWinScore?.quiz??8;
+  // Merge built-in with parent custom questions
+  const all=[...BUILT_IN_QUIZ,...(state.quizQuestions||[])].sort(()=>Math.random()-.5);
+  gameState.quiz={score:0,target,diff,pool:all,qi:0,streak:0};
+  renderQuizBlitz();
+}
+function renderQuizBlitz(){
+  const s=gameState.quiz;if(!s)return;
+  if(s.qi>=s.pool.length)s.qi=0;
+  const q=s.pool[s.qi++];
+  s._ans=q.answer;
+  const timeLimit=s.diff==='easy'?20:s.diff==='hard'?8:13;
+  s._timeLeft=timeLimit;
+  if(s._timer)clearInterval(s._timer);
+  const el=eduEl();if(!el)return;
+  const shuffled=q.options.map((opt,i)=>({opt,orig:i})).sort(()=>Math.random()-.5);
+  s._ans=shuffled.findIndex(x=>x.orig===q.answer);
+  el.innerHTML=`
+    <div style="text-align:center">
+      ${eduScoreHtml(s.score,s.target,s.streak)}
+      <div style="font-size:.8rem;color:var(--muted);font-weight:700;margin-bottom:8px">${q.cat||'❓ Trivia'}</div>
+    </div>
+    <div style="background:linear-gradient(135deg,#f97316,#ef4444);border-radius:20px;padding:20px;text-align:center;margin:4px 0">
+      <div style="font-size:1.15rem;font-family:'Fredoka One',cursive;color:white;line-height:1.3">${q.q}</div>
+      <div id="quizTimer" style="font-size:.9rem;color:rgba(255,255,255,.8);font-weight:800;margin-top:8px">${timeLimit}s</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
+      ${shuffled.map((item,i)=>`<button class="btn" onclick="quizAnswer(${i})"
+        style="padding:16px 10px;font-size:.95rem;font-weight:800;border-radius:16px;text-align:center;
+          background:var(--surface2);border:3px solid var(--border);color:var(--text);
+          box-shadow:0 4px 0 var(--border);line-height:1.3">${item.opt}</button>`).join('')}
+    </div>`;
+  s._timer=setInterval(()=>{
+    s._timeLeft--;
+    const t=document.getElementById('quizTimer');
+    if(t)t.textContent=s._timeLeft+'s';
+    if(s._timeLeft<=0){clearInterval(s._timer);quizAnswer(-1);}
+  },1000);
+}
+function quizAnswer(chosen){
+  const s=gameState.quiz;if(!s)return;
+  clearInterval(s._timer);
+  const correct=chosen===s._ans;
+  if(correct){s.score++;s.streak++;}else{s.streak=0;}
+  const el=eduEl();if(!el)return;
+  el.querySelectorAll('button').forEach((b,i)=>{
+    if(i===s._ans)b.style.cssText+=';background:#10b981;color:white;border-color:#10b981';
+    else if(i===chosen&&!correct)b.style.cssText+=';background:#ef4444;color:white;border-color:#ef4444';
+    b.disabled=true;
+  });
+  const flash=document.createElement('div');
+  flash.style.cssText=`position:fixed;inset:0;background:${correct?'rgba(16,185,129,.25)':'rgba(239,68,68,.25)'};z-index:999;pointer-events:none`;
+  document.body.appendChild(flash);setTimeout(()=>flash.remove(),500);
+  setTimeout(()=>{
+    if(s.score>=s.target){onGameWin(s.score);return;}
+    renderQuizBlitz();
+  },correct?600:1500);
+}
+
+// ══════════════════════════════════════════════════════════════
+// TO-DO LIST
+// ══════════════════════════════════════════════════════════════
+
 function renderTodo(type,userId){
   if(!state.todos)state.todos={};
   const todos=state.todos[userId]||[];
@@ -3202,8 +3695,10 @@ function hydrateState(saved){
   if(!saved.todos)           saved.todos={};
   if(!saved.dayBoard)        saved.dayBoard=[];
   if(!saved.needsList)       saved.needsList=[];
-  if(!saved.gameWinScore)    saved.gameWinScore={pong:5,snake:10,breakout:0,space:0,dino:20};
+  if(!saved.gameWinScore)    saved.gameWinScore={pong:5,snake:10,breakout:0,space:0,dino:20,mathblast:10,memory:8,oddoneout:8,quiz:8};
+  ['mathblast','memory','oddoneout','quiz'].forEach(id=>{if(saved.gameWinScore[id]===undefined)saved.gameWinScore[id]={mathblast:10,memory:8,oddoneout:8,quiz:8}[id];});
   if(saved.dinoJumpPts===undefined) saved.dinoJumpPts=1;
+  if(!saved.quizQuestions)   saved.quizQuestions=[];
   // Fix kids missing new fields
   if(saved.kids) saved.kids.forEach(k=>{ if(!k.bgColor) k.bgColor=KC[k.id%KC.length]; });
   return saved;
