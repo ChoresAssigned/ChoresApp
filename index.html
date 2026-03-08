@@ -3400,7 +3400,8 @@ function openProfileEdit(type,id){
     preview.innerHTML=`<span style="font-size:2.8rem">${profile.emoji||'👤'}</span>`;
   }
   document.getElementById('pe-name').value=profile.name||'';
-  document.getElementById('pe-pin').value=profile.pin||'';
+  document.getElementById('pe-pin').value=''; // leave blank — only save if user types a new one
+  document.getElementById('pe-pin').placeholder=`Current: ${(profile.pin||'').replace(/./g,'●')} · Type to change`;
   const bedWrap=document.getElementById('pe-bedtime-wrap');
   const colorWrap=document.getElementById('pe-color-wrap');
   if(type==='kid'){
@@ -3773,6 +3774,9 @@ async function startLiveSync(){
     _unsubscribe = onValue(ref(db,'appState'), snap=>{
       const data = snap.val();
       if(!data) return;
+      // Don't overwrite state while a modal is open — would wipe unsaved edits
+      const anyModalOpen=[...document.querySelectorAll('.modal-overlay')].some(m=>m.style.display==='flex'||m.classList.contains('open'));
+      if(anyModalOpen) return;
       Object.assign(state, hydrateState(data));
       if(session.type) renderTab(session.type, session.id);
       renderHome();
