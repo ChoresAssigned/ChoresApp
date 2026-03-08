@@ -2386,7 +2386,7 @@ function initMemoryMatrix(){
   gameRunning=true;
   const diff=getDiff('memory');
   const target=state.gameWinScore?.memory??8;
-  const size=diff==='easy'?3:diff==='hard'?5:4; // grid dimension
+  const size=diff==='easy'?3:diff==='hard'?5:4;
   gameState.memory={score:0,target,diff,size,level:1,phase:'show'};
   renderMemoryRound();
 }
@@ -2395,61 +2395,106 @@ function renderMemoryRound(){
   const {size,level}=s;
   const total=size*size;
   const lit=Math.min(2+level,Math.floor(total*0.6));
-  // Pick random cells to light
   const cells=[];while(cells.length<lit){const c=Math.floor(Math.random()*total);if(!cells.includes(c))cells.push(c);}
   s._pattern=cells;s._selected=[];s.phase='show';
-  const showTime=Math.max(500,1800-(level*150));
+  const showTime=Math.max(600,2000-(level*120));
   const el=eduEl();if(!el)return;
+  // Tile size: fill available width nicely
+  const tileSize=Math.min(80, Math.floor((Math.min(window.innerWidth,500)-60)/size));
   el.innerHTML=`
     <div style="text-align:center">
       ${eduScoreHtml(s.score,s.target,0)}
-      <div style="font-size:.85rem;color:var(--muted);font-weight:700;margin-bottom:8px">Round ${level} · Watch the pattern!</div>
+      <div style="font-size:.85rem;color:var(--muted);font-weight:700;margin-bottom:10px">Round ${level} · Watch the pattern!</div>
     </div>
-    <div id="memGrid" style="display:grid;grid-template-columns:repeat(${size},1fr);gap:8px;max-width:320px;margin:0 auto"></div>
-    <div id="memMsg" style="text-align:center;margin-top:10px;font-weight:800;font-size:.9rem;color:var(--muted)">Memorise...</div>`;
+    <div id="memGrid" style="display:grid;grid-template-columns:repeat(${size},${tileSize}px);gap:10px;justify-content:center;margin:0 auto 14px"></div>
+    <div id="memMsg" style="text-align:center;margin-top:6px;font-weight:800;font-size:.95rem;color:var(--muted)">Memorise...</div>
+    <div id="memSubmitWrap" style="text-align:center;margin-top:12px"></div>`;
   const grid=document.getElementById('memGrid');
   for(let i=0;i<total;i++){
     const btn=document.createElement('button');
     btn.dataset.idx=i;
-    const lit2=cells.includes(i);
-    btn.style.cssText=`width:100%;aspect-ratio:1;border-radius:12px;border:3px solid var(--border);
-      background:${lit2?'#8b5cf6':'var(--surface2)'};transition:all .2s;cursor:default;font-size:1.4rem`;
-    btn.textContent=lit2?'💜':'';
+    const isLit=cells.includes(i);
+    btn.style.cssText=`width:${tileSize}px;height:${tileSize}px;border-radius:14px;border:3px solid var(--border);
+      background:${isLit?'#8b5cf6':'var(--surface2)'};transition:all .15s;cursor:default;
+      font-size:${Math.round(tileSize*0.45)}px;display:flex;align-items:center;justify-content:center;
+      box-shadow:${isLit?'0 4px 12px rgba(139,92,246,.5)':'none'}`;
+    btn.textContent=isLit?'💜':'';
     grid.appendChild(btn);
   }
   setTimeout(()=>{
-    // Hide pattern
-    grid.querySelectorAll('button').forEach(b=>{b.style.background='var(--surface2)';b.textContent='';b.style.cursor='pointer';b.onclick=()=>memTap(parseInt(b.dataset.idx));});
-    document.getElementById('memMsg').textContent='Now tap the lit cells!';
+    // Hide pattern — enable tap-to-toggle
+    grid.querySelectorAll('button').forEach(b=>{
+      b.style.background='var(--surface2)';
+      b.style.boxShadow='none';
+      b.textContent='';
+      b.style.cursor='pointer';
+      b.onclick=()=>memTap(parseInt(b.dataset.idx));
+    });
+    document.getElementById('memMsg').textContent=`Tap the ${lit} lit tiles, then hit Submit!`;
+    document.getElementById('memSubmitWrap').innerHTML=
+      `<button class="btn btn-primary" id="memSubmitBtn" onclick="memSubmit()" style="padding:12px 32px;font-size:1rem;opacity:.4;cursor:not-allowed" disabled>
+        Submit (0 / ${lit} selected)
+      </button>`;
     s.phase='input';
   },showTime);
 }
 function memTap(idx){
   const s=gameState.memory;if(!s||s.phase!=='input')return;
-  s._selected.push(idx);
   const grid=document.getElementById('memGrid');
   const btn=grid?.querySelector(`[data-idx="${idx}"]`);
-  if(btn){btn.style.background='#8b5cf6';btn.textContent='💜';btn.disabled=true;}
-  if(s._selected.length===s._pattern.length){
-    // Check
-    const correct=s._pattern.every(c=>s._selected.includes(c));
-    if(correct){
-      s.score++;s.level++;
-      if(s.score>=s.target){onGameWin(s.score);return;}
-      const msg=document.getElementById('memMsg');
-      if(msg)msg.innerHTML='<span style="color:#10b981;font-size:1.1rem">✅ Correct! Next round...</span>';
-      setTimeout(()=>renderMemoryRound(),1000);
+  if(!btn)return;
+  const alreadySelected=s._selected.includes(idx);
+  if(alreadySelected){
+    // Deselect
+    s._selected=s._selected.filter(x=>x!==idx);
+    btn.style.background='var(--surface2)';
+    btn.style.boxShadow='none';
+    btn.textContent='';
+  } else {
+    // Select
+    s._selected.push(idx);
+    btn.style.background='#8b5cf6';
+    btn.style.boxShadow='0 4px 12px rgba(139,92,246,.5)';
+    btn.textContent='💜';
+  }
+  // Update submit button
+  const lit=s._pattern.length;
+  const sel=s._selected.length;
+  const submitBtn=document.getElementById('memSubmitBtn');
+  if(submitBtn){
+    submitBtn.textContent=`Submit (${sel} / ${lit} selected)`;
+    if(sel>0){submitBtn.disabled=false;submitBtn.style.opacity='1';submitBtn.style.cursor='pointer';}
+    else{submitBtn.disabled=true;submitBtn.style.opacity='.4';submitBtn.style.cursor='not-allowed';}
+  }
+}
+function memSubmit(){
+  const s=gameState.memory;if(!s||s.phase!=='input')return;
+  s.phase='result';
+  const grid=document.getElementById('memGrid');
+  const correct=s._pattern.length===s._selected.length&&s._pattern.every(c=>s._selected.includes(c));
+  // Reveal result on all tiles
+  grid.querySelectorAll('button').forEach(b=>{
+    const i=parseInt(b.dataset.idx);
+    b.onclick=null;b.style.cursor='default';
+    if(s._pattern.includes(i)&&s._selected.includes(i)){
+      b.style.background='#10b981';b.style.boxShadow='0 4px 12px rgba(16,185,129,.5)';b.textContent='✅';
+    } else if(s._pattern.includes(i)&&!s._selected.includes(i)){
+      b.style.background='#f59e0b';b.style.boxShadow='none';b.textContent='⚠️'; // missed
+    } else if(!s._pattern.includes(i)&&s._selected.includes(i)){
+      b.style.background='#ef4444';b.style.boxShadow='none';b.textContent='❌'; // wrong
     } else {
-      // Show correct cells
-      grid.querySelectorAll('button').forEach(b=>{
-        const i=parseInt(b.dataset.idx);
-        if(s._pattern.includes(i)){b.style.background='#10b981';b.textContent='✅';}
-        else if(s._selected.includes(i)&&!s._pattern.includes(i)){b.style.background='#ef4444';b.textContent='❌';}
-        b.disabled=true;
-      });
-      document.getElementById('memMsg').innerHTML='<span style="color:#ef4444">❌ Wrong! Game Over</span>';
-      setTimeout(()=>onGameLose(s.score),1500);
+      b.style.background='var(--surface2)';b.textContent='';
     }
+  });
+  document.getElementById('memSubmitWrap').innerHTML='';
+  if(correct){
+    s.score++;s.level++;
+    document.getElementById('memMsg').innerHTML='<span style="color:#10b981;font-size:1.1rem">✅ Perfect! Next round...</span>';
+    if(s.score>=s.target){setTimeout(()=>onGameWin(s.score),1000);return;}
+    setTimeout(()=>renderMemoryRound(),1200);
+  } else {
+    document.getElementById('memMsg').innerHTML='<span style="color:#ef4444">❌ Not quite! Game Over</span>';
+    setTimeout(()=>onGameLose(s.score),1600);
   }
 }
 
