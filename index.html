@@ -619,8 +619,10 @@ let state={
   nextRewardId:8, nextChoreId:6,
   rewardRequests:[],
   history:{},
-  messages:[], // [{id, from, fromName, fromEmoji, to, text, time, read:[]}]
+  messages:[], // [{id, from, fromId, fromName, fromEmoji, fromType, to, toName, text, time, read:[]}]
   todos:{}, // { userId: [{id, text, done, createdAt}] }
+  dayBoard:[], // [{id, text, authorName, authorEmoji, pinned, time}] — parent/supervisor daily messages for kids
+  needsList:[], // [{id, text, addedBy, addedByEmoji, done, time}] — shopping/needs requests
   gameWinScore:{pong:5,snake:10,breakout:0,space:0,dino:20}, // 0 = clear all
   dinoJumpPts:1, // points earned per obstacle cleared in dino
   // difficulty per game: easy|medium|hard
@@ -770,65 +772,115 @@ function enterApp(type,id){
 }
 
 // ═══ TABS ═══
+function getUnreadCount(userId){
+  return (state.messages||[]).filter(m=>{
+    const isForMe=(m.to===userId||m.to==='all'||m.to==='allstaff');
+    return isForMe&&!(m.read||[]).includes(String(userId));
+  }).length;
+}
+function getMsgLabel(userId){
+  const n=getUnreadCount(userId);
+  return n>0?`💬 <span style="background:#ef4444;color:white;border-radius:10px;padding:1px 6px;font-size:.7rem">${n}</span>`:'💬';
+}
 function buildTabs(type,id){
   let tabs=[];
   if(type==='kid'){
-    const unread=(state.messages||[]).filter(m=>(m.to===id||m.to==='all')&&!(m.read||[]).includes(id)).length;
-    const msgLabel=unread>0?`💬 <span style="background:#ef4444;color:white;border-radius:10px;padding:1px 6px;font-size:.7rem">${unread}</span>`:'💬';
     tabs=[
       {id:'chores',label:'📋 Chores'},
       {id:'points',label:'⭐ Points'},
       {id:'rewards',label:'🎁 Rewards'},
       {id:'arcade',label:'🎮 Arcade'},
       {id:'leaderboard',label:'🏆 Scores'},
-      {id:'messages',label:msgLabel,raw:true},
+      {id:'messages',label:getMsgLabel(id),raw:true},
+      {id:'dayboard',label:'📌 Board'},
+      {id:'needs',label:'🛒 Needs'},
       {id:'profile',label:'👤 Profile'},
     ];
   }
   else if(type==='supervisor'){
-    tabs=[{id:'signoff',label:'✅ Sign Off'},{id:'arcade',label:'🎮 Arcade'},{id:'todo',label:'📝 To-Do'}];
+    tabs=[
+      {id:'signoff',label:'✅ Sign Off'},
+      {id:'messages',label:getMsgLabel('sup_'+id),raw:true},
+      {id:'dayboard',label:'📌 Board'},
+      {id:'needs',label:'🛒 Needs'},
+      {id:'arcade',label:'🎮 Arcade'},
+      {id:'todo',label:'📝 To-Do'},
+    ];
     state.kids.forEach(k=>tabs.push({id:`view-${k.id}`,label:`${k.emoji} ${k.name}`}));
   }
   else{
     const pendingReqs=(state.rewardRequests||[]).filter(r=>r.status==='pending').length;
-    const rwLabel=pendingReqs>0?`🎁 Rewards <span style="background:#ef4444;color:white;border-radius:10px;padding:1px 6px;font-size:.7rem">${pendingReqs}</span>`:'🎁 Rewards';
-    tabs=[{id:'overview',label:'📊 Overview'},{id:'rewards',label:rwLabel,raw:true},{id:'history',label:'📅 History'},{id:'messages',label:'💬 Messages'},{id:'todo',label:'📝 To-Do'},{id:'arcade',label:'🎮 Arcade'},{id:'leaderboard',label:'🏆 Scores'},{id:'settings',label:'⚙️ Settings'}];
+    const rwLabel=pendingReqs>0?`🎁 <span style="background:#ef4444;color:white;border-radius:10px;padding:1px 6px;font-size:.7rem">${pendingReqs}</span>`:'🎁 Rewards';
+    tabs=[
+      {id:'overview',label:'📊 Overview'},
+      {id:'rewards',label:rwLabel,raw:true},
+      {id:'history',label:'📅 History'},
+      {id:'messages',label:getMsgLabel('par_'+id),raw:true},
+      {id:'dayboard',label:'📌 Board'},
+      {id:'needs',label:'🛒 Needs'},
+      {id:'todo',label:'📝 To-Do'},
+      {id:'arcade',label:'🎮 Arcade'},
+      {id:'leaderboard',label:'🏆 Scores'},
+      {id:'settings',label:'⚙️ Settings'},
+    ];
     state.kids.forEach(k=>tabs.push({id:`parent-${k.id}`,label:`${k.emoji} ${k.name}`}));
   }
   activeTab=tabs[0].id;
-  document.getElementById('tabBar').innerHTML=tabs.map(t=>`<button class="tab-btn${t.id===activeTab?' active':''}" onclick="switchTab('${t.id}')">${t.raw?t.label:t.label}</button>`).join('');
+  document.getElementById('tabBar').innerHTML=tabs.map(t=>`<button class="tab-btn${t.id===activeTab?' active':''}" onclick="switchTab('${t.id}')">${t.label}</button>`).join('');
   renderTab(type,id);
 }
 function switchTab(tabId){
   activeTab=tabId;
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.getAttribute('onclick')===`switchTab('${tabId}')`));
   renderTab(session.type,session.id);
+  // Refresh message badges after switching
+  _refreshMsgBadges();
+}
+function _refreshMsgBadges(){
+  if(!session.type||!session.id)return;
+  const myKey=session.type==='kid'?session.id:session.type==='supervisor'?'sup_'+session.id:'par_'+session.id;
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    const oc=btn.getAttribute('onclick')||'';
+    if(oc.includes("'messages'")){
+      const n=getUnreadCount(myKey);
+      btn.innerHTML=n>0?`💬 <span style="background:#ef4444;color:white;border-radius:10px;padding:1px 6px;font-size:.7rem">${n}</span>`:'💬';
+    }
+  });
 }
 function renderTab(type,id){
   const c=document.getElementById('tabContent');
+  // helper — get a stable string user key for messaging
+  const userKey=type==='kid'?id:type==='supervisor'?'sup_'+id:'par_'+id;
   if(type==='kid'){
     const kid=getKid(id);
-    if(activeTab==='chores') c.innerHTML=renderKidChores(kid);
-    else if(activeTab==='points') c.innerHTML=renderKidPoints(kid);
-    else if(activeTab==='rewards') c.innerHTML=renderRewards(false);
-    else if(activeTab==='arcade') c.innerHTML=renderArcadeMenu(id);
-    else if(activeTab==='leaderboard') c.innerHTML=renderLeaderboard();
-    else if(activeTab==='messages'){c.innerHTML=renderMessages(false,id);markMessagesRead(id);}
-    else if(activeTab==='profile') c.innerHTML=renderKidProfile(id);
+    if(activeTab==='chores')          c.innerHTML=renderKidChores(kid);
+    else if(activeTab==='points')     c.innerHTML=renderKidPoints(kid);
+    else if(activeTab==='rewards')    c.innerHTML=renderRewards(false);
+    else if(activeTab==='arcade')     c.innerHTML=renderArcadeMenu(id);
+    else if(activeTab==='leaderboard')c.innerHTML=renderLeaderboard();
+    else if(activeTab==='messages')  {c.innerHTML=renderMessages(userKey);markMessagesRead(userKey);}
+    else if(activeTab==='dayboard')   c.innerHTML=renderDayBoard(false);
+    else if(activeTab==='needs')      c.innerHTML=renderNeedsList(userKey,type);
+    else if(activeTab==='profile')    c.innerHTML=renderKidProfile(id);
   } else if(type==='supervisor'){
-    if(activeTab==='signoff') c.innerHTML=renderSignOff();
-    else if(activeTab==='arcade') c.innerHTML=renderStaffArcadeMenu(type,id);
-    else if(activeTab==='todo') c.innerHTML=renderTodo(type,id);
+    if(activeTab==='signoff')         c.innerHTML=renderSignOff();
+    else if(activeTab==='messages')  {c.innerHTML=renderMessages(userKey);markMessagesRead(userKey);}
+    else if(activeTab==='dayboard')   c.innerHTML=renderDayBoard(true,userKey,type);
+    else if(activeTab==='needs')      c.innerHTML=renderNeedsList(userKey,type);
+    else if(activeTab==='arcade')     c.innerHTML=renderStaffArcadeMenu(type,id);
+    else if(activeTab==='todo')       c.innerHTML=renderTodo(type,id);
     else c.innerHTML=renderKidChores(getKid(parseInt(activeTab.split('-')[1])));
   } else {
-    if(activeTab==='overview') c.innerHTML=renderParentOverview();
-    else if(activeTab==='rewards') c.innerHTML=renderRewards(true);
-    else if(activeTab==='history'){c.innerHTML='<div style="padding:16px"><button class="btn btn-primary" onclick="openHistoryModal()">📅 Open History Browser</button></div>';return;}
-    else if(activeTab==='messages') c.innerHTML=renderMessages(true,id);
-    else if(activeTab==='todo') c.innerHTML=renderTodo(type,id);
-    else if(activeTab==='arcade') c.innerHTML=renderStaffArcadeMenu(type,id);
-    else if(activeTab==='leaderboard') c.innerHTML=renderLeaderboard();
-    else if(activeTab==='settings'){renderSettings();return;}
+    if(activeTab==='overview')        c.innerHTML=renderParentOverview();
+    else if(activeTab==='rewards')    c.innerHTML=renderRewards(true);
+    else if(activeTab==='history')   {c.innerHTML='<div style="padding:16px"><button class="btn btn-primary" onclick="openHistoryModal()">📅 Open History Browser</button></div>';return;}
+    else if(activeTab==='messages')  {c.innerHTML=renderMessages(userKey);markMessagesRead(userKey);}
+    else if(activeTab==='dayboard')   c.innerHTML=renderDayBoard(true,userKey,type);
+    else if(activeTab==='needs')      c.innerHTML=renderNeedsList(userKey,type);
+    else if(activeTab==='todo')       c.innerHTML=renderTodo(type,id);
+    else if(activeTab==='arcade')     c.innerHTML=renderStaffArcadeMenu(type,id);
+    else if(activeTab==='leaderboard')c.innerHTML=renderLeaderboard();
+    else if(activeTab==='settings')  {renderSettings();return;}
     else c.innerHTML=renderParentKid(parseInt(activeTab.split('-')[1]));
   }
 }
@@ -2232,77 +2284,329 @@ function kidUploadPhoto(kidId,input){
     notify('📷 Photo updated!','#10b981');
   });
 }
-function renderMessages(isParent,userId){
-  const msgs=state.messages||[];
-  const myMsgs=isParent
-    ? msgs.slice().reverse()
-    : msgs.filter(m=>m.to===userId||m.to==='all'||m.from===userId).slice().reverse();
-  const kids=state.kids;
-  const toOptions=isParent
-    ? `<option value="all">📢 All Kids</option>${kids.map(k=>`<option value="${k.id}">${k.emoji} ${k.name}</option>`).join('')}`
-    : `<option value="parent">👑 Parent</option>`;
-  const senderLabel=isParent?'Parent':'Kids';
+// ═══ UNIFIED MESSAGING ═══
+// userKey format: kid id (number), 'sup_'+id (supervisor), 'par_'+id (parent)
+
+function resolveProfile(userKey){
+  if(typeof userKey==='number'||(!isNaN(userKey)&&String(userKey)===String(parseInt(userKey)))){
+    const k=getKid(parseInt(userKey));
+    return k?{name:k.name,emoji:k.emoji,type:'kid',id:parseInt(userKey)}:null;
+  }
+  if(String(userKey).startsWith('sup_')){
+    const id=String(userKey).replace('sup_','');
+    const s=state.supervisors.find(x=>String(x.id)===id);
+    return s?{name:s.name,emoji:s.emoji,type:'supervisor',id:s.id}:null;
+  }
+  if(String(userKey).startsWith('par_')){
+    const id=String(userKey).replace('par_','');
+    const p=state.parents.find(x=>String(x.id)===id);
+    return p?{name:p.name,emoji:p.emoji,type:'parent',id:p.id}:null;
+  }
+  return null;
+}
+
+function getAllRecipientOptions(myKey){
+  const opts=[];
+  // broadcast options
+  opts.push({val:'all',label:'📢 Everyone'});
+  opts.push({val:'allkids',label:'👧 All Kids'});
+  opts.push({val:'allstaff',label:'🏠 All Staff'});
+  // individual parents
+  state.parents.forEach(p=>{
+    const k='par_'+p.id;
+    if(k!==String(myKey)) opts.push({val:k,label:`👑 ${p.name}`});
+  });
+  // individual supervisors
+  state.supervisors.forEach(s=>{
+    const k='sup_'+s.id;
+    if(k!==String(myKey)) opts.push({val:k,label:`🔑 ${s.name}`});
+  });
+  // individual kids
+  state.kids.forEach(k=>{
+    if(String(k.id)!==String(myKey)) opts.push({val:String(k.id),label:`${k.emoji} ${k.name}`});
+  });
+  return opts;
+}
+
+function msgIsForMe(m, myKey){
+  const to=String(m.to);
+  const mk=String(myKey);
+  if(to===mk) return true;
+  if(to==='all') return true;
+  if(to==='allkids'&&!mk.startsWith('sup_')&&!mk.startsWith('par_')) return true;
+  if(to==='allstaff'&&(mk.startsWith('sup_')||mk.startsWith('par_'))) return true;
+  return false;
+}
+
+function renderMessages(myKey){
+  if(!state.messages) state.messages=[];
+  const msgs=state.messages;
+  const mk=String(myKey);
+  // Only show messages I sent or received
+  const myMsgs=msgs.filter(m=>String(m.from)===mk||msgIsForMe(m,mk)).slice().reverse();
+
+  const recipOpts=getAllRecipientOptions(mk);
+  const selectHtml=`<select id="msgTo" class="diff-sel" style="width:100%;margin-bottom:8px">
+    ${recipOpts.map(o=>`<option value="${o.val}">${o.label}</option>`).join('')}
+  </select>`;
+
   const composeBox=`
     <div class="card" style="margin-bottom:12px">
       <div style="font-size:.82rem;font-weight:800;color:var(--muted);margin-bottom:6px">✉️ New Message</div>
-      ${isParent?`<select id="msgTo" class="diff-sel" style="width:100%;margin-bottom:8px">${toOptions}</select>`:`<input type="hidden" id="msgTo" value="parent">`}
-      <textarea id="msgText" placeholder="Type your message..." style="width:100%;min-height:70px;border:2px solid var(--border);border-radius:10px;padding:8px;font-family:'Nunito',sans-serif;font-size:.88rem;background:var(--surface2);color:var(--text);resize:none;margin-bottom:8px"></textarea>
-      <button class="btn btn-primary btn-sm" onclick="sendMessage(${isParent},${isParent?'null':userId})">📤 Send</button>
+      ${selectHtml}
+      <textarea id="msgText" placeholder="Type your message..."
+        style="width:100%;min-height:70px;border:2px solid var(--border);border-radius:10px;padding:8px;
+        font-family:'Nunito',sans-serif;font-size:.88rem;background:var(--surface2);color:var(--text);resize:none;margin-bottom:8px"
+        onkeydown="if(event.ctrlKey&&event.key==='Enter')sendMessage('${mk}')"></textarea>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:.72rem;color:var(--muted);font-weight:700">Ctrl+Enter to send</span>
+        <button class="btn btn-primary btn-sm" onclick="sendMessage('${mk}')">📤 Send</button>
+      </div>
     </div>`;
-  const clearBtn=isParent?`<button class="btn btn-red btn-sm" style="margin-bottom:10px" onclick="clearMessages()">🗑️ Clear All Messages</button>`:'';
+
+  const isParent=mk.startsWith('par_');
+  const clearBtn=isParent?`<button class="btn btn-red btn-sm" style="margin-bottom:10px" onclick="clearMessages()">🗑️ Clear All</button>`:'';
+
   const msgHtml=myMsgs.length?myMsgs.map(m=>{
-    const isOwn=isParent?(m.from==='parent'):(m.from===userId);
-    const fromKid=kids.find(k=>k.id===m.from);
-    const name=m.from==='parent'?'👑 Parent':(fromKid?`${fromKid.emoji} ${fromKid.name}`:'Unknown');
-    const toKid=kids.find(k=>k.id===m.to);
-    const toLabel=m.to==='all'?'📢 All Kids':m.to==='parent'?'👑 Parent':(toKid?`${toKid.emoji} ${toKid.name}`:'?');
-    const unread=!isParent&&!(m.read||[]).includes(userId);
-    return`<div style="display:flex;flex-direction:column;align-items:${isOwn?'flex-end':'flex-start'};margin-bottom:10px">
-      <div style="font-size:.72rem;color:var(--muted);font-weight:700;margin-bottom:3px">${name} → ${toLabel} · ${m.time}</div>
-      <div style="max-width:80%;background:${isOwn?'linear-gradient(135deg,#ff7a00,#f59e0b)':'var(--surface2)'};color:${isOwn?'white':'var(--text)'};
+    const isOwn=String(m.from)===mk;
+    const sender=resolveProfile(m.from);
+    const senderLabel=sender?`${sender.emoji} ${sender.name}`:'❓ Unknown';
+    // Resolve "to" label
+    const toLabels={'all':'📢 Everyone','allkids':'👧 All Kids','allstaff':'🏠 All Staff'};
+    let toLabel=toLabels[String(m.to)]||'';
+    if(!toLabel){
+      const toP=resolveProfile(m.to);
+      toLabel=toP?`${toP.emoji} ${toP.name}`:'❓';
+    }
+    const unread=!isOwn&&!(m.read||[]).includes(mk);
+    const bubbleColor=isOwn
+      ?'linear-gradient(135deg,#ff7a00,#f59e0b)'
+      :m.from&&String(m.from).startsWith('par_')
+        ?'linear-gradient(135deg,#7c3aed,#a78bfa)'
+        :String(m.from).startsWith('sup_')
+          ?'linear-gradient(135deg,#0ea5e9,#38bdf8)'
+          :'var(--surface2)';
+    const textColor=isOwn||!String(m.from||'').startsWith('var')?'white':'var(--text)';
+    const forceLight=!isOwn&&String(m.from||'').includes('_');
+    return`<div style="display:flex;flex-direction:column;align-items:${isOwn?'flex-end':'flex-start'};margin-bottom:12px">
+      <div style="font-size:.7rem;color:var(--muted);font-weight:700;margin-bottom:3px">${isOwn?'You':senderLabel} → ${toLabel} · ${m.time}</div>
+      <div style="max-width:82%;background:${bubbleColor};color:${isOwn||forceLight?'white':'var(--text)'};
         border-radius:${isOwn?'16px 16px 4px 16px':'16px 16px 16px 4px'};padding:10px 14px;font-size:.88rem;font-weight:700;
-        box-shadow:0 2px 8px rgba(0,0,0,.08);border:2px solid ${isOwn?'transparent':'var(--border)'};
-        ${unread?'border-color:#f59e0b;':''}">${m.text}</div>
-      ${unread?'<div style="font-size:.65rem;color:#f59e0b;font-weight:800;margin-top:2px">NEW ●</div>':''}
+        box-shadow:0 2px 8px rgba(0,0,0,.1);border:2px solid ${unread?'#f59e0b':'transparent'}">${escHtml(m.text)}</div>
+      ${unread?'<div style="font-size:.65rem;color:#f59e0b;font-weight:800;margin-top:2px">● NEW</div>':''}
     </div>`;
-  }).join(''):`<div style="color:var(--muted);text-align:center;padding:30px;font-weight:700">No messages yet 💬</div>`;
-  return`<h2 class="fredoka" style="margin-bottom:12px">💬 Messages</h2>${clearBtn}${composeBox}<div>${msgHtml}</div>`;
+  }).join(''):`<div style="color:var(--muted);text-align:center;padding:40px;font-weight:700;font-size:1.1rem">No messages yet 💬<br><span style="font-size:.85rem;font-weight:600">Send the first one above!</span></div>`;
+
+  return`<h2 class="fredoka" style="margin-bottom:12px">💬 Messages</h2>
+    ${clearBtn}${composeBox}
+    <div style="padding-bottom:20px">${msgHtml}</div>`;
 }
 
-function sendMessage(isParent,kidId){
+function sendMessage(myKey){
   const text=(document.getElementById('msgText')?.value||'').trim();
   if(!text){notify('Type a message first!','#ef4444');return;}
-  const to=isParent?(document.getElementById('msgTo')?.value||'all'):('parent');
-  const from=isParent?'parent':kidId;
-  const fromProfile=isParent
-    ? (state.parents.find(p=>p.id===session.id)||state.parents[0])
-    : getKid(kidId);
+  const to=document.getElementById('msgTo')?.value||'all';
+  const sender=resolveProfile(myKey);
+  if(!sender){notify('Cannot identify sender','#ef4444');return;}
   if(!state.messages)state.messages=[];
   state.messages.push({
-    id:`msg_${Date.now()}`,from,fromName:fromProfile?.name||'',fromEmoji:fromProfile?.emoji||'',
-    to:isParent?( isNaN(to)?to:parseInt(to) ):to,
-    text,time:new Date().toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}),
-    read:[from]
+    id:`msg_${Date.now()}`,
+    from:String(myKey),
+    fromName:sender.name,
+    fromEmoji:sender.emoji,
+    fromType:sender.type,
+    to,
+    text,
+    time:new Date().toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}),
+    read:[String(myKey)]
   });
+  // Keep max 200 messages
+  if(state.messages.length>200) state.messages=state.messages.slice(-200);
   document.getElementById('msgText').value='';
-  saveState();renderTab(session.type,session.id);
+  saveState();
+  renderTab(session.type,session.id);
   notify('💬 Message sent!','#10b981');
 }
 
-function markMessagesRead(kidId){
+function markMessagesRead(myKey){
+  const mk=String(myKey);
   let changed=false;
   (state.messages||[]).forEach(m=>{
-    if((m.to===kidId||m.to==='all')&&!(m.read||[]).includes(kidId)){
+    if(msgIsForMe(m,mk)&&!(m.read||[]).includes(mk)){
       if(!m.read)m.read=[];
-      m.read.push(kidId);changed=true;
+      m.read.push(mk);changed=true;
     }
   });
   if(changed)saveState();
 }
 
 function clearMessages(){
-  if(!confirm('Clear all messages?'))return;
+  if(!confirm('Clear ALL messages for everyone? This cannot be undone.'))return;
   state.messages=[];saveState();renderTab(session.type,session.id);notify('🗑️ Messages cleared');
+}
+
+function escHtml(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ═══ DAY BOARD — parent/supervisor posts daily instructions for kids ═══
+function renderDayBoard(canPost, myKey, myType){
+  if(!state.dayBoard)state.dayBoard=[];
+  const board=state.dayBoard;
+  const today=todayKey();
+
+  const postBox=canPost?`
+    <div class="card" style="margin-bottom:14px;border-left:4px solid #f59e0b">
+      <div style="font-size:.82rem;font-weight:800;color:var(--muted);margin-bottom:6px">📌 Post to Day Board</div>
+      <textarea id="dbText" placeholder="e.g. Make your own dinner tonight, No screens until homework is done..."
+        style="width:100%;min-height:80px;border:2px solid var(--border);border-radius:10px;padding:8px;
+        font-family:'Nunito',sans-serif;font-size:.9rem;background:var(--surface2);color:var(--text);resize:none;margin-bottom:8px"></textarea>
+      <div style="display:flex;gap:8px;align-items:center">
+        <label style="display:flex;align-items:center;gap:6px;font-size:.82rem;font-weight:800;cursor:pointer">
+          <input type="checkbox" id="dbPinned" style="width:16px;height:16px;accent-color:#f59e0b"> 📌 Pin this
+        </label>
+        <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="postDayBoard('${myKey}')">📤 Post</button>
+      </div>
+    </div>`:'';
+
+  const items=board.slice().sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0)||(b.id>a.id?1:-1));
+  const boardHtml=items.length?items.map(item=>{
+    const isOwn=canPost&&String(item.authorKey)===String(myKey);
+    const isPinned=item.pinned;
+    return`<div class="card" style="margin-bottom:10px;border-left:4px solid ${isPinned?'#f59e0b':'var(--border)'};position:relative">
+      ${isPinned?'<div style="position:absolute;top:8px;right:10px;font-size:1.2rem">📌</div>':''}
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:1.4rem">${item.authorEmoji||'👤'}</span>
+        <div>
+          <div style="font-weight:800;font-size:.88rem">${escHtml(item.authorName||'Staff')}</div>
+          <div style="font-size:.7rem;color:var(--muted);font-weight:700">${item.time||''}</div>
+        </div>
+        ${isOwn?`<button onclick="deleteDayBoard('${item.id}')" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--muted);font-size:.9rem;padding:4px 8px">✕</button>`:''}
+      </div>
+      <div style="font-size:.95rem;font-weight:700;line-height:1.5">${escHtml(item.text)}</div>
+    </div>`;
+  }).join(''):`<div style="color:var(--muted);text-align:center;padding:40px;font-weight:700;font-size:1rem">
+    📌 Nothing posted today yet<br><span style="font-size:.82rem">Staff can post daily instructions here</span></div>`;
+
+  const clearBtn=canPost&&board.length?`<button class="btn btn-outline btn-sm" style="margin-bottom:10px" onclick="clearDayBoard()">🗑️ Clear Board</button>`:'';
+
+  return`<h2 class="fredoka" style="margin-bottom:4px">📌 Day Board</h2>
+    <div style="font-size:.8rem;color:var(--muted);font-weight:700;margin-bottom:14px">Daily instructions & reminders from staff</div>
+    ${clearBtn}${postBox}<div>${boardHtml}</div>`;
+}
+
+function postDayBoard(myKey){
+  const text=(document.getElementById('dbText')?.value||'').trim();
+  if(!text){notify('Write something first!','#ef4444');return;}
+  const pinned=document.getElementById('dbPinned')?.checked||false;
+  const sender=resolveProfile(myKey);
+  if(!state.dayBoard)state.dayBoard=[];
+  state.dayBoard.unshift({
+    id:`db_${Date.now()}`,
+    authorKey:String(myKey),
+    authorName:sender?.name||'Staff',
+    authorEmoji:sender?.emoji||'📌',
+    text,pinned,
+    time:new Date().toLocaleString([],{weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
+  });
+  if(state.dayBoard.length>50) state.dayBoard=state.dayBoard.slice(0,50);
+  document.getElementById('dbText').value='';
+  if(document.getElementById('dbPinned')) document.getElementById('dbPinned').checked=false;
+  saveState();renderTab(session.type,session.id);notify('📌 Posted to Day Board!','#f59e0b');
+}
+
+function deleteDayBoard(id){
+  state.dayBoard=(state.dayBoard||[]).filter(i=>i.id!==id);
+  saveState();renderTab(session.type,session.id);
+}
+
+function clearDayBoard(){
+  if(!confirm('Clear all Day Board posts?'))return;
+  state.dayBoard=[];saveState();renderTab(session.type,session.id);notify('🗑️ Board cleared');
+}
+
+// ═══ NEEDS LIST — anyone can add, parent can clear/mark done ═══
+function renderNeedsList(myKey, myType){
+  if(!state.needsList)state.needsList=[];
+  const needs=state.needsList;
+  const isStaff=myType==='parent'||myType==='supervisor';
+
+  const composeBox=`
+    <div class="card" style="margin-bottom:14px;border-left:4px solid #10b981">
+      <div style="font-size:.82rem;font-weight:800;color:var(--muted);margin-bottom:6px">➕ Add to Needs List</div>
+      <div style="display:flex;gap:8px">
+        <input class="f-inp" id="needsInput" placeholder="e.g. Tissue, Apple juice, Laundry pods..."
+          style="flex:1" onkeydown="if(event.key==='Enter')addNeedsItem('${myKey}')">
+        <button class="btn btn-primary" onclick="addNeedsItem('${myKey}')">Add</button>
+      </div>
+    </div>`;
+
+  const pending=needs.filter(n=>!n.done);
+  const done=needs.filter(n=>n.done);
+
+  const renderItem=(n)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <input type="checkbox" ${n.done?'checked':''} onchange="toggleNeedsItem('${n.id}',this.checked)"
+        style="width:20px;height:20px;accent-color:#10b981;cursor:pointer;flex-shrink:0">
+      <div style="flex:1">
+        <div style="font-size:.9rem;font-weight:700;${n.done?'text-decoration:line-through;color:var(--muted)':''}">${escHtml(n.text)}</div>
+        <div style="font-size:.7rem;color:var(--muted);font-weight:700">${n.addedByEmoji||''} ${escHtml(n.addedBy||'')} · ${n.time||''}</div>
+      </div>
+      ${isStaff?`<button onclick="deleteNeedsItem('${n.id}')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:1rem;padding:2px 6px">✕</button>`:''}
+    </div>`;
+
+  const pendingHtml=pending.length?`
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-weight:800;color:var(--muted);font-size:.78rem;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">🛒 Needed (${pending.length})</div>
+      ${pending.map(renderItem).join('')}
+    </div>`:'';
+
+  const doneHtml=done.length?`
+    <div class="card" style="margin-bottom:12px;opacity:.75">
+      <div style="font-weight:800;color:var(--muted);font-size:.78rem;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">✅ Got it (${done.length})</div>
+      ${done.map(renderItem).join('')}
+      ${isStaff?`<button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="clearDoneNeeds()">🗑️ Clear done</button>`:''}
+    </div>`:'';
+
+  const emptyHtml=!pending.length&&!done.length?`
+    <div style="color:var(--muted);text-align:center;padding:40px;font-weight:700;font-size:1rem">
+      🛒 List is empty!<br><span style="font-size:.82rem">Add things the family needs above</span>
+    </div>`:'' ;
+
+  return`<h2 class="fredoka" style="margin-bottom:4px">🛒 Needs List</h2>
+    <div style="font-size:.8rem;color:var(--muted);font-weight:700;margin-bottom:14px">Request household items — anyone can add</div>
+    ${composeBox}${pendingHtml}${doneHtml}${emptyHtml}`;
+}
+
+function addNeedsItem(myKey){
+  const inp=document.getElementById('needsInput');
+  const text=(inp?.value||'').trim();
+  if(!text){notify('Type something first!','#ef4444');return;}
+  const sender=resolveProfile(myKey);
+  if(!state.needsList)state.needsList=[];
+  state.needsList.push({
+    id:`need_${Date.now()}`,
+    text,
+    addedBy:sender?.name||'Someone',
+    addedByEmoji:sender?.emoji||'👤',
+    done:false,
+    time:new Date().toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
+  });
+  inp.value='';
+  saveState();renderTab(session.type,session.id);notify('🛒 Added to Needs List!','#10b981');
+}
+
+function toggleNeedsItem(id,done){
+  const item=(state.needsList||[]).find(n=>n.id===id);
+  if(item){item.done=done;saveState();renderTab(session.type,session.id);}
+}
+
+function deleteNeedsItem(id){
+  state.needsList=(state.needsList||[]).filter(n=>n.id!==id);
+  saveState();renderTab(session.type,session.id);
+}
+
+function clearDoneNeeds(){
+  state.needsList=(state.needsList||[]).filter(n=>!n.done);
+  saveState();renderTab(session.type,session.id);notify('✅ Cleared done items');
 }
 
 // ═══ KID PROFILE TAB ═══
@@ -2635,7 +2939,13 @@ function midnightReset(){
     k.tidyChecked=false;k.tidySigned=false;
     // Points carry over — NOT reset
   });
-  saveState();notify('🌅 New day! Chores reset.','#0ea5e9');
+  // Also reset reward requests that were handled (keep pending ones)
+  state.rewardRequests=(state.rewardRequests||[]).filter(r=>r.status==='pending');
+  // Clear pinned day board posts older than 3 days, archive rest
+  const threeDaysAgo=Date.now()-(3*24*60*60*1000);
+  state.dayBoard=(state.dayBoard||[]).filter(item=>item.pinned||new Date(item.id.replace('db_','')).getTime()>threeDaysAgo);
+  saveState();
+  notify('🌅 New day! Chores reset.','#0ea5e9');
   if(session.type)renderTab(session.type,session.id);
 }
 function scheduleMidnightReset(){
@@ -2776,6 +3086,8 @@ function hydrateState(saved){
   if(!saved.history)         saved.history={};
   if(!saved.messages)        saved.messages=[];
   if(!saved.todos)           saved.todos={};
+  if(!saved.dayBoard)        saved.dayBoard=[];
+  if(!saved.needsList)       saved.needsList=[];
   if(!saved.gameWinScore)    saved.gameWinScore={pong:5,snake:10,breakout:0,space:0,dino:20};
   if(saved.dinoJumpPts===undefined) saved.dinoJumpPts=1;
   // Fix any chores missing days or kids arrays (old data)
