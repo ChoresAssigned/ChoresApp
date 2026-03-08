@@ -1655,8 +1655,15 @@ function setupMobileControls(row1,row2){
 const keys={};
 document.addEventListener('keydown',e=>{
   keys[e.code]=true;
-  if(['ArrowUp','ArrowDown','Space'].includes(e.code))e.preventDefault();
-  // Route to current game
+  // Only block default scroll/space behaviour when a game is active AND focus is NOT in a text field
+  const inTextField=(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)||document.activeElement?.isContentEditable);
+  if(gameRunning&&!inTextField&&['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();
+  // Space on the game overlay = click the Start / Try Again button
+  if(!gameRunning&&e.code==='Space'){
+    const btn=document.getElementById('goBtn');
+    if(btn&&btn.offsetParent!==null){e.preventDefault();btn.click();}
+    return;
+  }
   if(!gameRunning)return;
   if(currentGameId==='pong'){
     if(e.code==='ArrowUp'||e.code==='KeyW')gameState.pong.keys.up=true;
