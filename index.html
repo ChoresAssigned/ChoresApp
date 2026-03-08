@@ -1177,6 +1177,27 @@ function setScoreBar(items){
 }
 
 function onGameWin(score){
+  // Staff (no point changes)
+  if(String(currentGameKidId).startsWith('staff_')){
+    stopCurrentGame();
+    updateStaffLeaderboard(currentGameId,currentGameKidId,score);
+    confetti();saveState();
+    if(EDU_GAMES.includes(currentGameId)){
+      const el=document.getElementById('eduGame');
+      if(el)el.innerHTML=`<div style="text-align:center;padding:40px 20px">
+        <div style="font-size:4rem;margin-bottom:12px">🎉</div>
+        <div style="font-family:'Fredoka One',cursive;font-size:2rem;color:#10b981;margin-bottom:8px">You Won!</div>
+        <div style="font-size:1rem;color:var(--muted);font-weight:800;margin-bottom:20px">Score: ${score} (staff — no points)</div>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="initGame(currentGameId)">Play Again</button>
+          <button class="btn btn-outline" onclick="exitGame()">← Back</button>
+        </div></div>`;
+      return;
+    }
+    showOverlay('🎉','You Won!',`Score: ${score}`,'Play Again 🔄',()=>{initGame(currentGameId);startCurrentGame();});
+    return;
+  }
+  // Kid win
   stopCurrentGame();
   const kid=getKid(currentGameKidId);const g=GAME_DEFS.find(x=>x.id===currentGameId);
   const reward=g.edu?3:2;
@@ -1187,7 +1208,6 @@ function onGameWin(score){
   if(badge)badge.textContent=`${kid.emoji} ${kid.name} · ${kid.points} ⭐`;
   confetti();saveState();
   if(EDU_GAMES.includes(currentGameId)){
-    // Edu games show result in their own UI div
     const el=document.getElementById('eduGame');
     if(el)el.innerHTML=`<div style="text-align:center;padding:40px 20px">
       <div style="font-size:4rem;margin-bottom:12px">🎉</div>
@@ -1196,8 +1216,7 @@ function onGameWin(score){
       <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
         <button class="btn btn-primary" onclick="eduPlayAgain()">Play Again (1 ⭐)</button>
         <button class="btn btn-outline" onclick="exitGame()">← Back</button>
-      </div>
-    </div>`;
+      </div></div>`;
     return;
   }
   showOverlay('🎉','You Won!',`+${reward} ⭐ earned! Score: ${score}`,'Play Again 🔄',()=>{
@@ -1211,6 +1230,26 @@ function onGameWin(score){
 }
 
 function onGameLose(score){
+  // Staff
+  if(String(currentGameKidId).startsWith('staff_')){
+    stopCurrentGame();
+    updateStaffLeaderboard(currentGameId,currentGameKidId,score);
+    if(EDU_GAMES.includes(currentGameId)){
+      const el=document.getElementById('eduGame');
+      if(el)el.innerHTML=`<div style="text-align:center;padding:40px 20px">
+        <div style="font-size:4rem;margin-bottom:12px">😢</div>
+        <div style="font-family:'Fredoka One',cursive;font-size:2rem;color:#ef4444;margin-bottom:8px">Game Over!</div>
+        <div style="font-size:1rem;color:var(--muted);font-weight:800;margin-bottom:20px">Score: ${score}</div>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="initGame(currentGameId)">Try Again</button>
+          <button class="btn btn-outline" onclick="exitGame()">← Back</button>
+        </div></div>`;
+      return;
+    }
+    showOverlay('😢','Game Over!',`Score: ${score}`,'Try Again',()=>{initGame(currentGameId);startCurrentGame();});
+    return;
+  }
+  // Kid
   stopCurrentGame();
   const g=GAME_DEFS.find(x=>x.id===currentGameId);
   updateLeaderboard(currentGameId,currentGameKidId,score);
@@ -1223,8 +1262,7 @@ function onGameLose(score){
       <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
         <button class="btn btn-primary" onclick="eduPlayAgain()">Try Again (1 ⭐)</button>
         <button class="btn btn-outline" onclick="exitGame()">← Back</button>
-      </div>
-    </div>`;
+      </div></div>`;
     saveState();return;
   }
   showOverlay('😢','Game Over!',`Score: ${score} · Point was used. Try again?`,'Try Again (1 ⭐)',()=>{
@@ -2230,54 +2268,7 @@ function buildStaffArcadeScreen(gameId,profile){
   },60);
 }
 
-// Override onGameWin/Lose to handle staff (no point changes)
-const _origOnGameWin=onGameWin;
-const _origOnGameLose=onGameLose;
-function onGameWin(score){
-  if(String(currentGameKidId).startsWith('staff_')){
-    stopCurrentGame();
-    updateStaffLeaderboard(currentGameId,currentGameKidId,score);
-    confetti();
-    if(EDU_GAMES.includes(currentGameId)){
-      const el=document.getElementById('eduGame');
-      if(el)el.innerHTML=`<div style="text-align:center;padding:40px 20px">
-        <div style="font-size:4rem;margin-bottom:12px">🎉</div>
-        <div style="font-family:'Fredoka One',cursive;font-size:2rem;color:#10b981;margin-bottom:8px">You Won!</div>
-        <div style="font-size:1rem;color:var(--muted);font-weight:800;margin-bottom:20px">Score: ${score} (staff — no points)</div>
-        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="initGame(currentGameId)">Play Again</button>
-          <button class="btn btn-outline" onclick="exitGame()">← Back</button>
-        </div>
-      </div>`;
-      return;
-    }
-    showOverlay('🎉','You Won!',`Score: ${score}`,'Play Again 🔄',()=>{initGame(currentGameId);startCurrentGame();});
-    return;
-  }
-  _origOnGameWin(score);
-}
-function onGameLose(score){
-  if(String(currentGameKidId).startsWith('staff_')){
-    stopCurrentGame();
-    updateStaffLeaderboard(currentGameId,currentGameKidId,score);
-    if(EDU_GAMES.includes(currentGameId)){
-      const el=document.getElementById('eduGame');
-      if(el)el.innerHTML=`<div style="text-align:center;padding:40px 20px">
-        <div style="font-size:4rem;margin-bottom:12px">😢</div>
-        <div style="font-family:'Fredoka One',cursive;font-size:2rem;color:#ef4444;margin-bottom:8px">Game Over!</div>
-        <div style="font-size:1rem;color:var(--muted);font-weight:800;margin-bottom:20px">Score: ${score}</div>
-        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="initGame(currentGameId)">Try Again</button>
-          <button class="btn btn-outline" onclick="exitGame()">← Back</button>
-        </div>
-      </div>`;
-      return;
-    }
-    showOverlay('😢','Game Over!',`Score: ${score}`,'Try Again',()=>{initGame(currentGameId);startCurrentGame();});
-    return;
-  }
-  _origOnGameLose(score);
-}
+// (staff win/lose handling is merged into onGameWin/onGameLose above)
 }
 
 function updateStaffLeaderboard(gameId,staffKey,score){
