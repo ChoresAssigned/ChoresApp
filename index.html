@@ -647,7 +647,7 @@ let currentGameId=null,currentGameKidId=null;
 function csKey(k,c){return`${k}_${c}`}
 function getCS(k,c){return state.choreState[csKey(k,c)]||{checked:false,signed:false,cancelled:false,checkedAt:null}}
 function setCS(k,c,p){state.choreState[csKey(k,c)]=Object.assign(getCS(k,c),p)}
-function kidChores(id){return state.chores.filter(c=>c.kids&&c.kids.includes(id)&&(!(c.days&&c.days.length)||c.days.includes(TODAY_NAME)))}
+function kidChores(id){return state.chores.filter(c=>c.kids&&c.kids.some(k=>k==id)&&(!(c.days&&c.days.length)||c.days.includes(TODAY_NAME)))}
 function allSigned(id){return kidChores(id).every(c=>{const s=getCS(id,c.id);return s.signed||s.cancelled})}
 function getKid(id){return state.kids.find(k=>k.id===id)}
 function getDiff(gameId){return state.gameDifficulty[gameId]||'medium'}
@@ -944,7 +944,9 @@ function renderKidChores(kid){
       :'<span class="badge badge-pending">To Do</span>';
     return`<div class="chore-row ${rc}">
       <div class="chore-check-box ${bx}" onclick="${disabled?'':`toggleChore(${i},${c.id})`}" style="${disabled?'cursor:default':''}">${cs.signed||cs.checked?'✓':''}</div>
-      <div class="chore-info"><div class="chore-name">${c.name} ${dl}</div>${cs.checkedAt?`<div class="chore-meta">${cs.checkedAt.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>`:''}</div>${bg}</div>`;
+      <div class="chore-info"><div class="chore-name">${c.name} ${dl}</div>${cs.checkedAt?`<div class="chore-meta">${cs.checkedAt.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>`:''}</div>
+      ${bg}
+    </div>`;
   }
 
   const morningSection=morning.length?`
@@ -3157,12 +3159,26 @@ function serialiseState(){
 }
 
 // ── Re-hydrate dates after reading from Firebase ──
+function toArr(v){ return Array.isArray(v) ? v : (v && typeof v==='object' ? Object.values(v) : []); }
+
 function hydrateState(saved){
   const dateFields=['loggedInAt','approvedAt','homeTime'];
+  // Firebase can return arrays as objects — normalize everything first
+  if(saved.kids)           saved.kids=toArr(saved.kids);
+  if(saved.chores)         saved.chores=toArr(saved.chores);
+  if(saved.rewards)        saved.rewards=toArr(saved.rewards);
+  if(saved.rewardRequests) saved.rewardRequests=toArr(saved.rewardRequests);
+  if(saved.messages)       saved.messages=toArr(saved.messages);
+  if(saved.supervisors)    saved.supervisors=toArr(saved.supervisors);
+  if(saved.parents)        saved.parents=toArr(saved.parents);
+  if(saved.dayBoard)       saved.dayBoard=toArr(saved.dayBoard);
+  if(saved.needsList)      saved.needsList=toArr(saved.needsList);
+
   if(saved.kids){
     saved.kids.forEach(k=>{
       dateFields.forEach(f=>{ if(k[f]) k[f]=new Date(k[f]); });
       if(!k.pointLog) k.pointLog=[];
+      k.pointLog=toArr(k.pointLog);
       if(k.tidyChecked===undefined) k.tidyChecked=false;
       if(k.tidySigned===undefined)  k.tidySigned=false;
     });
@@ -3172,6 +3188,12 @@ function hydrateState(saved){
       if(cs.checkedAt) cs.checkedAt=new Date(cs.checkedAt);
     });
   }
+  // Fix chores — normalize kids/days arrays (Firebase turns them into objects)
+  if(saved.chores) saved.chores.forEach(c=>{
+    c.days = toArr(c.days);
+    c.kids = toArr(c.kids).map(Number); // ensure numeric IDs
+    if(!c.category) c.category='afterschool';
+  });
   if(!saved.rewardRequests)  saved.rewardRequests=[];
   if(!saved.gameDifficulty)  saved.gameDifficulty={pong:'medium',snake:'medium',breakout:'medium',space:'medium',dino:'medium'};
   if(!saved.leaderboard)     saved.leaderboard={pong:[],snake:[],breakout:[],space:[],dino:[]};
@@ -3182,8 +3204,6 @@ function hydrateState(saved){
   if(!saved.needsList)       saved.needsList=[];
   if(!saved.gameWinScore)    saved.gameWinScore={pong:5,snake:10,breakout:0,space:0,dino:20};
   if(saved.dinoJumpPts===undefined) saved.dinoJumpPts=1;
-  // Fix any chores missing days or kids arrays (old data)
-  if(saved.chores) saved.chores.forEach(c=>{ if(!c.days) c.days=[]; if(!c.kids) c.kids=[]; });
   // Fix kids missing new fields
   if(saved.kids) saved.kids.forEach(k=>{ if(!k.bgColor) k.bgColor=KC[k.id%KC.length]; });
   return saved;
