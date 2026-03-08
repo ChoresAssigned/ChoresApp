@@ -235,6 +235,7 @@ input.f-inp:focus,select.f-inp:focus,.form-row input:focus,.form-row select:focu
 .day-tag{padding:3px 9px;border-radius:9px;font-size:.7rem;font-weight:800;border:2px solid var(--border);
   background:var(--surface2);color:var(--muted);cursor:pointer;transition:all .12s}
 .day-tag.on{background:#ede9fe;color:#7c3aed;border-color:#c4b5fd}
+.cat-tag.on{background:#fff3e0;color:#c2440e;border-color:#fdba74}
 input[type="time"]{background:var(--surface2);border:2px solid var(--border);border-radius:9px;color:var(--text);
   padding:5px 9px;font-family:'Nunito',sans-serif;font-size:.88rem}
 .bedtime-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;
@@ -555,6 +556,12 @@ select.diff-sel{background:var(--surface2);border:2px solid var(--border);border
   <div class="modal-box">
     <h3 id="choreModalTitle">➕ Add Chore</h3>
     <div class="form-row"><input class="f-inp" id="ch-name-in" placeholder="Chore name" style="flex:1"></div>
+    <div style="margin:8px 0 5px;font-size:.83rem;font-weight:800;color:var(--muted)">Category:</div>
+    <div class="day-tags-wrap" id="ch-cat-row">
+      <span class="day-tag cat-tag" data-cat="morning">🌅 Morning</span>
+      <span class="day-tag cat-tag on" data-cat="afterschool">🏠 After School</span>
+      <span class="day-tag cat-tag" data-cat="afterdinner">🌙 After Dinner</span>
+    </div>
     <div style="margin:8px 0 5px;font-size:.83rem;font-weight:800;color:var(--muted)">Assigned to:</div>
     <div class="form-row" id="ch-kids-row"></div>
     <div style="margin:8px 0 5px;font-size:.83rem;font-weight:800;color:var(--muted)">Days (empty = every day):</div>
@@ -888,56 +895,94 @@ function renderTab(type,id){
 // ═══ KID CHORES ═══
 function renderKidChores(kid){
   if(!kid)return'';
-  const i=kid.id,chores=kidChores(i);
-  const done=chores.filter(c=>getCS(i,c.id).checked).length;
-  const signed=chores.filter(c=>getCS(i,c.id).signed).length;
-  const pct=chores.length?Math.round(signed/chores.length*100):100;
+  const i=kid.id;
+  const allChores=kidChores(i);
+
+  // Split by category — default old chores to afterschool
+  const morning    =allChores.filter(c=>(c.category||'afterschool')==='morning');
+  const afterSchool=allChores.filter(c=>(c.category||'afterschool')==='afterschool');
+  const afterDinner=allChores.filter(c=>(c.category||'afterschool')==='afterdinner');
+
+  const done  =allChores.filter(c=>getCS(i,c.id).checked).length;
+  const signed=allChores.filter(c=>getCS(i,c.id).signed).length;
+  const pct   =allChores.length?Math.round(signed/allChores.length*100):100;
+
+  // Timer only applies to after-school chores
   const mins=kid.homeTime?Math.floor((new Date()-kid.homeTime)/60000):null;
   let timerHtml='';
   if(mins!==null&&!kid.approvedAt){
-    if(mins<=60)timerHtml=`<span class="timer-chip timer-2pt">⏱ ${mins}m — 2pts!</span>`;
+    if(mins<=60)     timerHtml=`<span class="timer-chip timer-2pt">⏱ ${mins}m — 2pts!</span>`;
     else if(mins<=120)timerHtml=`<span class="timer-chip timer-1pt">⏱ ${mins}m — 1pt!</span>`;
-    else timerHtml=`<span class="timer-chip timer-out">⏱ ${mins}m</span>`;
+    else              timerHtml=`<span class="timer-chip timer-out">⏱ ${mins}m</span>`;
   }
   const approvalHtml=kid.approvedAt
     ?`<div class="free-time-banner approved">🎉<div><strong>FREE TIME!</strong><br><span style="font-size:.8rem;font-weight:600">Approved ${kid.approvedAt.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span></div></div>`
-    :kid.homeTime?`<div class="free-time-banner waiting">⏳<div>${signed}/${chores.length} signed ${timerHtml}</div></div>`:'';
-  const loginHtml=!kid.loggedInAt
-    ?`<div class="card" style="text-align:center;padding:20px;background:${KB[i]};border-color:${KBD[i]}">
-        <div style="font-size:2.5rem;margin-bottom:7px">🏠</div>
-        <div style="font-weight:800;margin-bottom:12px">Tap when you're home to start your timer!</div>
-        <button class="btn btn-green" onclick="loginKid(${i})">I'm Home! 🏠</button>
-      </div>`
-    :`<div style="font-size:.8rem;color:var(--muted);margin-bottom:10px;font-weight:700">🏠 Home since <strong>${kid.homeTime.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</strong></div>`;
-  const choreRows=chores.map(c=>{
-    const cs=getCS(i,c.id);const disabled=cs.cancelled||cs.signed||!kid.loggedInAt;
+    :kid.homeTime?`<div class="free-time-banner waiting">⏳<div>${signed}/${allChores.length} signed ${timerHtml}</div></div>`:'';
+
+  // "I'm Home" card — only shown if there are after-school chores
+  const loginHtml=afterSchool.length
+    ?(!kid.loggedInAt
+      ?`<div class="card" style="text-align:center;padding:20px;background:${KB[i]};border-color:${KBD[i]}">
+          <div style="font-size:2.5rem;margin-bottom:7px">🏠</div>
+          <div style="font-weight:800;margin-bottom:6px">Tap when you're home!</div>
+          <div style="font-size:.8rem;color:var(--muted);font-weight:700;margin-bottom:12px">Starts your bonus points timer for after-school chores</div>
+          <button class="btn btn-green" onclick="loginKid(${i})">I'm Home! 🏠</button>
+        </div>`
+      :`<div style="font-size:.8rem;color:var(--muted);margin-bottom:10px;font-weight:700">🏠 Home since <strong>${kid.homeTime.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</strong></div>`)
+    :'';
+
+  // Render a chore row — locked = not clickable
+  function choreRow(c, locked=false){
+    const cs=getCS(i,c.id);
+    const disabled=cs.cancelled||cs.signed||locked;
     const bx=cs.signed?'signed':cs.checked?'checked':'';
     const rc=cs.cancelled?'is-cancelled':cs.signed?'is-signed':cs.checked?'is-done':'';
     const dl=c.days.length?`<span class="chore-day-tag">${c.days.join('·')}</span>`:'';
-    const bg=cs.cancelled?'<span class="badge badge-cancelled">Cancelled</span>':cs.signed?'<span class="badge badge-signed">✓ Signed</span>':cs.checked?'<span class="badge badge-done">Done!</span>':'<span class="badge badge-pending">To Do</span>';
+    const bg=cs.cancelled?'<span class="badge badge-cancelled">Cancelled</span>'
+      :cs.signed?'<span class="badge badge-signed">✓ Signed</span>'
+      :cs.checked?'<span class="badge badge-done">Done!</span>'
+      :'<span class="badge badge-pending">To Do</span>';
     return`<div class="chore-row ${rc}">
       <div class="chore-check-box ${bx}" onclick="${disabled?'':`toggleChore(${i},${c.id})`}" style="${disabled?'cursor:default':''}">${cs.signed||cs.checked?'✓':''}</div>
       <div class="chore-info"><div class="chore-name">${c.name} ${dl}</div>${cs.checkedAt?`<div class="chore-meta">${cs.checkedAt.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>`:''}</div>${bg}</div>`;
-  }).join('');
+  }
+
+  const morningSection=morning.length?`
+    <div class="section-head">🌅 Morning Chores</div>
+    <div style="font-size:.75rem;color:var(--muted);font-weight:700;margin:-6px 0 8px">No timer — check off anytime</div>
+    ${morning.map(c=>choreRow(c,false)).join('')}`:'';
+
+  const afterSchoolSection=afterSchool.length?`
+    <div class="section-head">🏠 After School Chores</div>
+    <div style="font-size:.75rem;color:var(--muted);font-weight:700;margin:-6px 0 8px">⭐ Bonus points for finishing within 1–2 hrs of getting home</div>
+    ${!kid.loggedInAt&&afterSchool.length?`<div style="font-size:.8rem;background:var(--surface2);border:2px dashed var(--border);border-radius:10px;padding:10px;text-align:center;color:var(--muted);font-weight:700;margin-bottom:8px">🔒 Tap "I'm Home" above to unlock</div>`:''}
+    ${afterSchool.map(c=>choreRow(c,!kid.loggedInAt)).join('')}`:'';
+
+  const afterDinnerSection=afterDinner.length?`
+    <div class="section-head">🌙 After Dinner Chores</div>
+    <div style="font-size:.75rem;color:var(--muted);font-weight:700;margin:-6px 0 8px">No timer — check off after dinner</div>
+    ${afterDinner.map(c=>choreRow(c,false)).join('')}`:'';
+
   const tidyRow=`<div class="section-head">🌙 Before Bed</div>
     <div class="chore-row ${kid.tidySigned?'is-signed':kid.tidyChecked?'is-done':''}">
       <div class="chore-check-box ${kid.tidySigned?'signed':kid.tidyChecked?'checked':''}" onclick="toggleTidy(${i})">${kid.tidyChecked?'✓':''}</div>
       <div class="chore-info"><div class="chore-name">Tidy up chore area 🧹</div><div class="chore-meta">+1 ⭐ when signed</div></div>
       ${kid.tidySigned?'<span class="badge badge-signed">+1 ⭐</span>':kid.tidyChecked?'<span class="badge badge-done">Awaiting sign-off</span>':''}
     </div>`;
+
   return`<div class="kid-hero" style="background:${KB[i]};border:2px solid ${KBD[i]};border-radius:18px">
     <div class="kid-hero-dots"></div>
     <div class="kid-hero-inner">
       <div class="kid-big-emoji">${kid.emoji}</div>
       <div style="flex:1"><h2 style="color:${KC[i]};font-size:1.7rem">${kid.name}</h2>
         <div style="color:var(--muted);font-size:.83rem;font-weight:700">Today · ${TODAY_NAME}</div>
-        <div class="kid-stat-row"><div class="stat-chip">⭐ ${kid.points}</div><div class="stat-chip">📋 ${done}/${chores.length}</div><div class="stat-chip">✅ ${signed}</div></div>
+        <div class="kid-stat-row"><div class="stat-chip">⭐ ${kid.points}</div><div class="stat-chip">📋 ${done}/${allChores.length}</div><div class="stat-chip">✅ ${signed}</div></div>
       </div></div></div>
     <div class="progress-wrap"><div class="progress-label"><span>Progress</span><span style="color:${KC[i]}">${pct}%</span></div>
       <div class="progress-track"><div class="progress-fill" style="width:${pct}%;background:${KC[i]}"></div></div></div>
     ${approvalHtml}${loginHtml}
-    <div class="section-head">📋 Today's Chores</div>
-    ${choreRows||'<div style="color:var(--muted);text-align:center;padding:16px;font-weight:700">No chores today! 🎉</div>'}
+    ${morningSection}${afterSchoolSection}${afterDinnerSection}
+    ${!allChores.length?'<div style="color:var(--muted);text-align:center;padding:16px;font-weight:700">No chores today! 🎉</div>':''}
     ${tidyRow}`;
 }
 
@@ -1934,7 +1979,8 @@ function renderSettings(){
     </div>`).join('');
   const choreList=state.chores.map(cc=>{
     const em=cc.kids.map(ki=>getKid(ki)?.emoji||'?').join(' ');
-    return`<div class="chore-edit-row"><div class="name">${cc.name}<div style="font-size:.7rem;color:var(--muted)">${em} · ${cc.days.length?cc.days.join('·'):'Every day'}</div></div><button class="btn btn-outline btn-sm" onclick="editChoreOpen(${cc.id})">✏️</button><button class="btn btn-red btn-sm" onclick="deleteChore(${cc.id})">🗑️</button></div>`;}).join('');
+    const catLabel={'morning':'🌅','afterschool':'🏠','afterdinner':'🌙'}[cc.category||'afterschool']||'🏠';
+    return`<div class="chore-edit-row"><div class="name">${cc.name}<div style="font-size:.7rem;color:var(--muted)">${catLabel} ${em} · ${cc.days.length?cc.days.join('·'):'Every day'}</div></div><button class="btn btn-outline btn-sm" onclick="editChoreOpen(${cc.id})">✏️</button><button class="btn btn-red btn-sm" onclick="deleteChore(${cc.id})">🗑️</button></div>`;}).join('');
   const diffRows=GAME_DEFS.map(g=>{
     const winScore=state.gameWinScore?.[g.id]??g.winScore;
     const winLabel=winScore===0?'Clear all':winScore;
@@ -2684,7 +2730,16 @@ function selectEmoji(e){
   _origSelectEmoji(e);
 }
 function loginKid(id){const k=getKid(id);k.loggedInAt=new Date();k.homeTime=new Date();notify(`${k.emoji} ${k.name} is home! ⏱️`,'#ff7a00');renderTab(session.type,session.id);saveState();}
-function toggleChore(kidId,choreId){const cs=getCS(kidId,choreId);if(cs.cancelled||cs.signed)return;if(!getKid(kidId).loggedInAt)return;setCS(kidId,choreId,{checked:!cs.checked,checkedAt:!cs.checked?new Date():null});renderTab(session.type,session.id);saveState();}
+function toggleChore(kidId,choreId){
+  const cs=getCS(kidId,choreId);
+  if(cs.cancelled||cs.signed)return;
+  const chore=state.chores.find(c=>c.id===choreId);
+  const cat=chore?.category||'afterschool';
+  // After-school chores require being logged home; morning/dinner are always free
+  if(cat==='afterschool'&&!getKid(kidId).loggedInAt)return;
+  setCS(kidId,choreId,{checked:!cs.checked,checkedAt:!cs.checked?new Date():null});
+  renderTab(session.type,session.id);saveState();
+}
 function toggleTidy(kidId){const k=getKid(kidId);if(k.tidySigned)return;k.tidyChecked=!k.tidyChecked;renderTab(session.type,session.id);saveState();}
 function signChore(kidId,choreId){setCS(kidId,choreId,{signed:true});checkAllSigned(kidId);notify('✅ Signed!','#10b981');renderTab(session.type,session.id);saveState();}
 function signTidy(kidId){const k=getKid(kidId);if(!k.tidyChecked)return;k.tidySigned=true;addPoints(kidId,1,'🧹 Tidied up before bed');renderTab(session.type,session.id);saveState();}
@@ -2745,21 +2800,51 @@ function saveReward(){
 function deleteReward(id){state.rewards=state.rewards.filter(r=>r.id!==id);renderTab(session.type,session.id);saveState();}
 
 // ═══ CHORE MODAL ═══
-function addChoreOpen(){editingChoreId=null;document.getElementById('choreModalTitle').textContent='➕ Add Chore';document.getElementById('ch-name-in').value='';buildChoreKidRow(state.kids.map(k=>k.id));document.querySelectorAll('#ch-days-row .day-tag').forEach(t=>t.classList.remove('on'));openModal('choreModal');}
-function editChoreOpen(id){editingChoreId=id;const c=state.chores.find(x=>x.id===id);document.getElementById('choreModalTitle').textContent='✏️ Edit Chore';document.getElementById('ch-name-in').value=c.name;buildChoreKidRow(c.kids);document.querySelectorAll('#ch-days-row .day-tag').forEach(t=>t.classList.toggle('on',c.days.includes(t.dataset.day)));openModal('choreModal');}
+function addChoreOpen(){
+  editingChoreId=null;
+  document.getElementById('choreModalTitle').textContent='➕ Add Chore';
+  document.getElementById('ch-name-in').value='';
+  buildChoreKidRow(state.kids.map(k=>k.id));
+  document.querySelectorAll('#ch-days-row .day-tag').forEach(t=>t.classList.remove('on'));
+  // Default category = afterschool
+  document.querySelectorAll('#ch-cat-row .cat-tag').forEach(t=>t.classList.toggle('on',t.dataset.cat==='afterschool'));
+  openModal('choreModal');
+}
+function editChoreOpen(id){
+  editingChoreId=id;
+  const c=state.chores.find(x=>x.id===id);
+  document.getElementById('choreModalTitle').textContent='✏️ Edit Chore';
+  document.getElementById('ch-name-in').value=c.name;
+  buildChoreKidRow(c.kids);
+  document.querySelectorAll('#ch-days-row .day-tag').forEach(t=>t.classList.toggle('on',c.days.includes(t.dataset.day)));
+  // Set category — default old chores to afterschool
+  const cat=c.category||'afterschool';
+  document.querySelectorAll('#ch-cat-row .cat-tag').forEach(t=>t.classList.toggle('on',t.dataset.cat===cat));
+  openModal('choreModal');
+}
+// Cat tags are single-select — clicking one deselects others
+document.addEventListener('click',e=>{
+  const ct=e.target.closest('.cat-tag');
+  if(ct){
+    document.querySelectorAll('#ch-cat-row .cat-tag').forEach(t=>t.classList.remove('on'));
+    ct.classList.add('on');
+  }
+});
 function buildChoreKidRow(sel){document.getElementById('ch-kids-row').innerHTML=state.kids.map((k,i)=>`<button class="btn btn-sm ${sel.includes(k.id)?'btn-primary':'btn-outline'}" style="${sel.includes(k.id)?`background:${KB[i]};color:${KC[i]};border-color:${KC[i]}`:''}" data-kid="${k.id}" onclick="toggleChoreKid(${k.id},this)">${k.emoji} ${k.name}</button>`).join('');}
 function toggleChoreKid(id,btn){btn.classList.toggle('btn-primary');btn.classList.toggle('btn-outline');}
 function saveChore(){
   const name=document.getElementById('ch-name-in').value.trim();if(!name){notify('Enter a name!','#ef4444');return;}
   const kids=[...document.querySelectorAll('#ch-kids-row [data-kid]')].filter(b=>b.classList.contains('btn-primary')).map(b=>parseInt(b.dataset.kid));
   const days=[...document.querySelectorAll('#ch-days-row .day-tag.on')].map(t=>t.dataset.day);
+  const category=document.querySelector('#ch-cat-row .cat-tag.on')?.dataset.cat||'afterschool';
   if(!kids.length){notify('Select a kid!','#ef4444');return;}
-  if(editingChoreId!==null)Object.assign(state.chores.find(x=>x.id===editingChoreId),{name,kids,days});
-  else state.chores.push({id:state.nextChoreId++,name,kids,days});
+  if(editingChoreId!==null)Object.assign(state.chores.find(x=>x.id===editingChoreId),{name,kids,days,category});
+  else state.chores.push({id:state.nextChoreId++,name,kids,days,category});
   closeModal('choreModal');renderTab(session.type,session.id);saveState();notify('✅ Saved!');
 }
 function deleteChore(id){state.chores=state.chores.filter(c=>c.id!==id);renderTab(session.type,session.id);saveState();}
-document.addEventListener('click',e=>{if(e.target.classList.contains('day-tag'))e.target.classList.toggle('on');});
+// Day tags toggle (but not cat-tags — those use the dedicated click handler above)
+document.addEventListener('click',e=>{if(e.target.classList.contains('day-tag')&&!e.target.classList.contains('cat-tag'))e.target.classList.toggle('on');});
 
 // ═══ PROFILE EDIT MODAL (unified) ═══
 const PROFILE_COLORS=['#ff3d6e','#00b896','#ff7a00','#7c3aed','#0ea5e9','#10b981','#f59e0b','#ec4899','#6366f1','#14b8a6'];
