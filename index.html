@@ -1750,7 +1750,11 @@ function updateDino(){
         document.getElementById('arcadePtsBadge').textContent=`${k?.emoji||''} ${k?.name||''} · ${k?.points||0} ⭐`;
       }
       if(d.score>=d.WIN&&!d._rewarded){onGameWin(d.score);}
-      if(d.score%5===0)d.speed=Math.min(d.speed+.5,12);
+      // Every 5 obstacles: speed up with no cap, and tighten spawn interval
+      if(d.score>0&&d.score%5===0){
+        d.speed=+(d.speed+0.6).toFixed(2); // accelerate forever, no ceiling
+        d.spawnInterval=Math.max(25,d.spawnInterval-5); // gaps shrink but never below 25 frames
+      }
     }return true;
   });
   // Collision
