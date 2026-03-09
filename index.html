@@ -1182,70 +1182,63 @@ function setScoreBar(items){
   bar.innerHTML=items.map(item=>`<div class="gsb-box"><div class="gsb-label">${item.label}</div><div class="gsb-val" style="color:${item.color||'var(--text)'}">${item.val}</div></div>`).join('');
 }
 
+// Called when score hits the win threshold — give reward but keep game running
 function onGameWin(score){
-  // Staff (no point changes)
-  if(String(currentGameKidId).startsWith('staff_')){
-    stopCurrentGame();
+  const isStaff=String(currentGameKidId).startsWith('staff_');
+  // Mark reward as given on the active gameState so we don't double-reward
+  const gs=gameState[currentGameId]||gameState;
+  if(gs&&gs._rewarded)return; // already rewarded this session
+  if(gs)gs._rewarded=true;
+
+  if(isStaff){
     updateStaffLeaderboard(currentGameId,currentGameKidId,score);
-    confetti();saveState();
+    confetti();
+    notify(`🎉 Win threshold hit! Keep going for a higher score!`,'#10b981');
+    // For edu games show a banner but continue
     if(EDU_GAMES.includes(currentGameId)){
-      const el=document.getElementById('eduGame');
-      if(el)el.innerHTML=`<div style="text-align:center;padding:40px 20px">
-        <div style="font-size:4rem;margin-bottom:12px">🎉</div>
-        <div style="font-family:'Fredoka One',cursive;font-size:2rem;color:#10b981;margin-bottom:8px">You Won!</div>
-        <div style="font-size:1rem;color:var(--muted);font-weight:800;margin-bottom:20px">Score: ${score} (staff — no points)</div>
-        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="initGame(currentGameId)">Play Again</button>
-          <button class="btn btn-outline" onclick="exitGame()">← Back</button>
-        </div></div>`;
-      return;
+      const badge=document.getElementById('arcadePtsBadge');
+      if(badge)badge.innerHTML+=` <span style="color:#f59e0b;font-weight:800">🏆</span>`;
     }
-    showOverlay('🎉','You Won!',`Score: ${score}`,'Play Again 🔄',()=>{initGame(currentGameId);startCurrentGame();});
-    return;
+    saveState();return;
   }
-  // Kid win
-  stopCurrentGame();
-  const kid=getKid(currentGameKidId);const g=GAME_DEFS.find(x=>x.id===currentGameId);
+
+  // Kid — give points reward once
+  const kid=getKid(currentGameKidId);
+  const g=GAME_DEFS.find(x=>x.id===currentGameId);
   const reward=g.edu?3:2;
   kid.points+=reward;
   kid.pointLog.unshift({amount:reward,reason:`${g.edu?'🧠':'🎮'} Won ${g.name}! Score: ${score}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
-  updateLeaderboard(currentGameId,currentGameKidId,score);
   const badge=document.getElementById('arcadePtsBadge');
-  if(badge)badge.textContent=`${kid.emoji} ${kid.name} · ${kid.points} ⭐`;
+  if(badge)badge.textContent=`${kid.emoji} ${kid.name} · ${kid.points} ⭐ 🏆`;
   confetti();saveState();
+  notify(`🏆 +${reward} ⭐ earned! Keep going for a high score!`,'#10b981');
+  // Edu games: show a brief flash banner inside the game, then continue
   if(EDU_GAMES.includes(currentGameId)){
     const el=document.getElementById('eduGame');
-    if(el)el.innerHTML=`<div style="text-align:center;padding:40px 20px">
-      <div style="font-size:4rem;margin-bottom:12px">🎉</div>
-      <div style="font-family:'Fredoka One',cursive;font-size:2rem;color:#10b981;margin-bottom:8px">You Won!</div>
-      <div style="font-size:1.1rem;font-weight:800;margin-bottom:20px">+${reward} ⭐ earned! Score: ${score}</div>
-      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-        <button class="btn btn-primary" onclick="eduPlayAgain()">Play Again (1 ⭐)</button>
-        <button class="btn btn-outline" onclick="exitGame()">← Back</button>
-      </div></div>`;
-    return;
+    const banner=document.createElement('div');
+    banner.style.cssText='position:fixed;top:80px;left:50%;transform:translateX(-50%);background:#10b981;color:white;font-family:Fredoka One,cursive;font-size:1.2rem;padding:12px 28px;border-radius:20px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.3);pointer-events:none';
+    banner.textContent=`🏆 +${reward} ⭐ Won! Keep going!`;
+    document.body.appendChild(banner);
+    setTimeout(()=>banner.remove(),2000);
   }
-  showOverlay('🎉','You Won!',`+${reward} ⭐ earned! Score: ${score}`,'Play Again 🔄',()=>{
-    const kid2=getKid(currentGameKidId);
-    if(kid2.points<1){showOverlay('😢','No Points','Earn more by doing chores!','Go Back',exitGame);return;}
-    kid2.points=Math.max(0,kid2.points-1);
-    kid2.pointLog.unshift({amount:-1,reason:`🎮 Played ${g.name}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
-    document.getElementById('arcadePtsBadge').textContent=`${kid2.emoji} ${kid2.name} · ${kid2.points} ⭐`;
-    initGame(currentGameId);startCurrentGame();
-  });
 }
 
-function onGameLose(score){
-  // Staff
-  if(String(currentGameKidId).startsWith('staff_')){
-    stopCurrentGame();
+// Called when game is truly over (loss, lives gone, etc.) — show end screen
+function onGameEnd(score){
+  const isStaff=String(currentGameKidId).startsWith('staff_');
+  const g=GAME_DEFS.find(x=>x.id===currentGameId);
+  const gs=gameState[currentGameId]||null;
+  const alreadyRewarded=gs?._rewarded||false;
+  updateLeaderboard(currentGameId,currentGameKidId,score);
+  stopCurrentGame();
+  if(isStaff){
     updateStaffLeaderboard(currentGameId,currentGameKidId,score);
     if(EDU_GAMES.includes(currentGameId)){
       const el=document.getElementById('eduGame');
       if(el)el.innerHTML=`<div style="text-align:center;padding:40px 20px">
         <div style="font-size:4rem;margin-bottom:12px">😢</div>
         <div style="font-family:'Fredoka One',cursive;font-size:2rem;color:#ef4444;margin-bottom:8px">Game Over!</div>
-        <div style="font-size:1rem;color:var(--muted);font-weight:800;margin-bottom:20px">Score: ${score}</div>
+        <div style="font-size:1rem;color:var(--muted);font-weight:800;margin-bottom:20px">Final Score: ${score}</div>
         <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
           <button class="btn btn-primary" onclick="initGame(currentGameId)">Try Again</button>
           <button class="btn btn-outline" onclick="exitGame()">← Back</button>
@@ -1255,31 +1248,32 @@ function onGameLose(score){
     showOverlay('😢','Game Over!',`Score: ${score}`,'Try Again',()=>{initGame(currentGameId);startCurrentGame();});
     return;
   }
-  // Kid
-  stopCurrentGame();
-  const g=GAME_DEFS.find(x=>x.id===currentGameId);
-  updateLeaderboard(currentGameId,currentGameKidId,score);
+  const kid=getKid(currentGameKidId);
   if(EDU_GAMES.includes(currentGameId)){
     const el=document.getElementById('eduGame');
     if(el)el.innerHTML=`<div style="text-align:center;padding:40px 20px">
       <div style="font-size:4rem;margin-bottom:12px">😢</div>
       <div style="font-family:'Fredoka One',cursive;font-size:2rem;color:#ef4444;margin-bottom:8px">Game Over!</div>
-      <div style="font-size:1rem;font-weight:800;color:var(--muted);margin-bottom:20px">Score: ${score} · Keep practising!</div>
+      <div style="font-size:1rem;font-weight:800;color:var(--muted);margin-bottom:20px">Final Score: ${score}${alreadyRewarded?' · Points already earned!':' · Keep practising!'}</div>
       <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
         <button class="btn btn-primary" onclick="eduPlayAgain()">Try Again (1 ⭐)</button>
         <button class="btn btn-outline" onclick="exitGame()">← Back</button>
       </div></div>`;
     saveState();return;
   }
-  showOverlay('😢','Game Over!',`Score: ${score} · Point was used. Try again?`,'Try Again (1 ⭐)',()=>{
-    const kid=getKid(currentGameKidId);
+  // Arcade game over
+  showOverlay('😢','Game Over!',`Final Score: ${score}${alreadyRewarded?' · Points already earned!':' · Point was used.'}` ,'Try Again (1 ⭐)',()=>{
     if(kid.points<1){showOverlay('😢','No Points','Earn more by doing chores!','Go Back',exitGame);return;}
     kid.points=Math.max(0,kid.points-1);
     kid.pointLog.unshift({amount:-1,reason:`🎮 Played ${g.name}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
-    document.getElementById('arcadePtsBadge').textContent=`${getKid(currentGameKidId).emoji} ${getKid(currentGameKidId).name} · ${getKid(currentGameKidId).points} ⭐`;
+    document.getElementById('arcadePtsBadge').textContent=`${kid.emoji} ${kid.name} · ${kid.points} ⭐`;
     initGame(currentGameId);startCurrentGame();
   });
+  saveState();
 }
+
+// onGameLose = alias for onGameEnd (game is truly over)
+function onGameLose(score){onGameEnd(score);}
 function eduPlayAgain(){
   const kid=getKid(currentGameKidId);
   const g=GAME_DEFS.find(x=>x.id===currentGameId);
@@ -1362,8 +1356,8 @@ function updatePong(){
     p.ball.vx=-Math.min(Math.abs(sp*Math.cos(ang2)),13);p.ball.vy=sp*Math.sin(ang2);
   }
   // Score
-  if(p.ball.x-p.ball.r<0){p.cpu.score++;setScoreBar([{label:'YOU',val:p.player.score,color:'#ff3d6e'},{label:'CPU',val:p.cpu.score,color:'#7c3aed'}]);if(p.cpu.score>=p.WIN){onGameLose(p.player.score);return;}resetPongBall(1);}
-  if(p.ball.x+p.ball.r>W){p.player.score++;setScoreBar([{label:'YOU',val:p.player.score,color:'#ff3d6e'},{label:'CPU',val:p.cpu.score,color:'#7c3aed'}]);if(p.player.score>=p.WIN){onGameWin(p.player.score);return;}resetPongBall(-1);}
+  if(p.ball.x-p.ball.r<0){p.cpu.score++;setScoreBar([{label:'YOU',val:p.player.score,color:'#ff3d6e'},{label:'CPU',val:p.cpu.score,color:'#7c3aed'}]);if(p.cpu.score>=p.WIN){onGameEnd(p.player.score);return;}resetPongBall(1);}
+  if(p.ball.x+p.ball.r>W){p.player.score++;setScoreBar([{label:'YOU',val:p.player.score,color:'#ff3d6e'},{label:'CPU',val:p.cpu.score,color:'#7c3aed'}]);if(p.player.score>=p.WIN&&!p._rewarded){onGameWin(p.player.score);}resetPongBall(-1);}
   drawPong();
 }
 
@@ -1452,12 +1446,12 @@ function updateSnake(){
   s.lastMove=now;s.dir={...s.nextDir};
   const head={x:s.body[0].x+s.dir.x,y:s.body[0].y+s.dir.y};
   if(head.x<0||head.x>=s.cols||head.y<0||head.y>=s.rows||s.body.some(b=>b.x===head.x&&b.y===head.y)){
-    onGameLose(s.score);return;
+    onGameEnd(s.score);return;
   }
   s.body.unshift(head);
   if(head.x===s.apple.x&&head.y===s.apple.y){
     s.score++;setScoreBar([{label:'Score',val:s.score,color:'#10b981'},{label:'Best',val:getBest('snake'),color:'#f59e0b'}]);
-    if(s.score>=s.WIN){onGameWin(s.score);return;}
+    if(s.score>=s.WIN&&!s._rewarded){onGameWin(s.score);}
     s.apple=randomSnakeApple(s.cols,s.rows,s.body);
   } else s.body.pop();
   drawSnake();
@@ -1536,7 +1530,7 @@ function updateBreakout(){
   if(b.ball.x-b.ball.r<0){b.ball.x=b.ball.r;b.ball.vx=Math.abs(b.ball.vx);}
   if(b.ball.x+b.ball.r>W){b.ball.x=W-b.ball.r;b.ball.vx=-Math.abs(b.ball.vx);}
   if(b.ball.y-b.ball.r<0){b.ball.y=b.ball.r;b.ball.vy=Math.abs(b.ball.vy);}
-  if(b.ball.y+b.ball.r>H){onGameLose(b.score);return;}
+  if(b.ball.y+b.ball.r>H){onGameEnd(b.score);return;}
   // Paddle
   if(b.ball.y+b.ball.r>b.paddle.y&&b.ball.y-b.ball.r<b.paddle.y+b.paddle.h&&b.ball.x>b.paddle.x&&b.ball.x<b.paddle.x+b.paddle.w){
     b.ball.vy=-Math.abs(b.ball.vy);
@@ -1550,7 +1544,7 @@ function updateBreakout(){
       brick.alive=false;b.score+=10;b.ball.vy*=-1;
       const alive=b.bricks.filter(x=>x.alive).length;
       setScoreBar([{label:'Bricks',val:alive,color:'#f59e0b'},{label:'Score',val:b.score,color:'#ff3d6e'}]);
-      if(alive===0){onGameWin(b.score);return;}
+      if(alive===0){onGameEnd(b.score);return;}
     }
   });
   drawBreakout();
@@ -1626,7 +1620,7 @@ function updateSpace(){
   s.alienBullets=s.alienBullets.filter(b=>{b.y+=b.vy;return b.y<H;});
   // Move aliens
   const alive=s.aliens.filter(a=>a.alive);
-  if(!alive.length){onGameWin(s.score);return;}
+  if(!alive.length){onGameEnd(s.score);return;}
   let hitWall=false;
   alive.forEach(a=>{a.x+=s.alienSpeed*s.alienDir;});
   alive.forEach(a=>{if(a.x<=0||a.x+a.w>=W)hitWall=true;});
@@ -1647,16 +1641,16 @@ function updateSpace(){
       if(a.alive&&b.x>a.x&&b.x<a.x+a.w&&b.y>a.y&&b.y<a.y+a.h){
         a.alive=false;b.y=-99;s.score+=10;
         setScoreBar([{label:'Score',val:s.score,color:'#0ea5e9'},{label:'Aliens',val:s.aliens.filter(x=>x.alive).length,color:'#ff3d6e'}]);
-        if(!s.aliens.some(x=>x.alive)){onGameWin(s.score);return;}
+        if(!s.aliens.some(x=>x.alive)){onGameEnd(s.score);return;}
       }
     });
   });
   // Alien bullet hits ship
   s.alienBullets.forEach(b=>{
-    if(b.x>s.ship.x&&b.x<s.ship.x+s.ship.w&&b.y>s.ship.y&&b.y<s.ship.y+s.ship.h){onGameLose(s.score);return;}
+    if(b.x>s.ship.x&&b.x<s.ship.x+s.ship.w&&b.y>s.ship.y&&b.y<s.ship.y+s.ship.h){onGameEnd(s.score);return;}
   });
   // Aliens reach bottom
-  if(alive.some(a=>a.y+a.h>=s.ship.y)){onGameLose(s.score);return;}
+  if(alive.some(a=>a.y+a.h>=s.ship.y)){onGameEnd(s.score);return;}
   drawSpace();
 }
 function drawSpace(){
@@ -1731,14 +1725,14 @@ function updateDino(){
         if(k){k.points+=jumpPts;k.pointLog.unshift({amount:jumpPts,reason:`🦕 Dino jump!`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});}
         document.getElementById('arcadePtsBadge').textContent=`${k?.emoji||''} ${k?.name||''} · ${k?.points||0} ⭐`;
       }
-      if(d.score>=d.WIN){onGameWin(d.score);return false;}
+      if(d.score>=d.WIN&&!d._rewarded){onGameWin(d.score);}
       if(d.score%5===0)d.speed=Math.min(d.speed+.5,12);
     }return true;
   });
   // Collision
   const dx=d.dino.x,dy=d.dino.y,dw=d.dino.w,dh=d.dino.h;
   for(const o of d.obstacles){
-    if(dx+dw-6>o.x&&dx+6<o.x+o.w&&dy+dh-4>o.y&&dy+4<o.y+o.h){onGameLose(d.score);return;}
+    if(dx+dw-6>o.x&&dx+6<o.x+o.w&&dy+dh-4>o.y&&dy+4<o.y+o.h){onGameEnd(d.score);return;}
   }
   drawDino();
 }
@@ -2386,8 +2380,8 @@ function mathAnswer(chosen,gid){
   });
   setTimeout(()=>{
     if(!gameState.mathblast||gameState.mathblast.gid!==gid||currentGameId!=='mathblast')return;
-    if(s.score>=s.target){onGameWin(s.score);return;}
-    if(s.lives<=0){onGameLose(s.score);return;}
+    if(s.score>=s.target&&!s._rewarded){onGameWin(s.score);}
+    if(s.lives<=0){onGameEnd(s.score);return;}
     renderMathBlast(gid);
   },correct?600:1200);
 }
@@ -2486,14 +2480,14 @@ function memSubmit(gid){
   if(correct){
     s.score++;s.level++;
     document.getElementById('memMsg').innerHTML='<span style="color:#10b981;font-size:1.1rem">✅ Perfect! Next round...</span>';
-    if(s.score>=s.target){setTimeout(()=>onGameWin(s.score),1000);return;}
+    if(s.score>=s.target){setTimeout(()=>onGameEnd(s.score),1000);return;}
     setTimeout(()=>{
       if(!gameState.memory||gameState.memory.gid!==gid||currentGameId!=='memory')return;
       renderMemoryRound(gid);
     },1200);
   } else {
     document.getElementById('memMsg').innerHTML='<span style="color:#ef4444">❌ Not quite! Game Over</span>';
-    setTimeout(()=>onGameLose(s.score),1600);
+    setTimeout(()=>onGameEnd(s.score),1600);
   }
 }
 
@@ -2578,8 +2572,8 @@ function oddAnswer(chosen,gid){
   eduFlash(correct);
   setTimeout(()=>{
     if(!gameState.oddoneout||gameState.oddoneout.gid!==gid||currentGameId!=='oddoneout')return;
-    if(s.score>=s.target){onGameWin(s.score);return;}
-    if(s.lives<=0){onGameLose(s.score);return;}
+    if(s.score>=s.target&&!s._rewarded){onGameWin(s.score);}
+    if(s.lives<=0){onGameEnd(s.score);return;}
     renderOddOneOut(gid);
   },correct?600:1400);
 }
@@ -2664,8 +2658,8 @@ function quizAnswer(chosen,gid){
   eduFlash(correct);
   setTimeout(()=>{
     if(!gameState.quiz||gameState.quiz.gid!==gid||currentGameId!=='quiz')return;
-    if(s.score>=s.target){onGameWin(s.score);return;}
-    if(s.lives<=0){onGameLose(s.score);return;}
+    if(s.score>=s.target&&!s._rewarded){onGameWin(s.score);}
+    if(s.lives<=0){onGameEnd(s.score);return;}
     renderQuizBlitz(gid);
   },correct?600:1500);
 }
