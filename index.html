@@ -1463,10 +1463,12 @@ function updateSnake(){
   const now=performance.now();
   if(now-s.lastMove<s.speed)return;
   s.lastMove=now;s.dir={...s.nextDir};
-  const head={x:s.body[0].x+s.dir.x,y:s.body[0].y+s.dir.y};
-  if(head.x<0||head.x>=s.cols||head.y<0||head.y>=s.rows||s.body.some(b=>b.x===head.x&&b.y===head.y)){
-    onGameEnd(s.score);return;
-  }
+  const head={
+    x:(s.body[0].x+s.dir.x+s.cols)%s.cols,
+    y:(s.body[0].y+s.dir.y+s.rows)%s.rows
+  };
+  // Only die on self-collision — walls now wrap
+  if(s.body.some(b=>b.x===head.x&&b.y===head.y)){onGameEnd(s.score);return;}
   s.body.unshift(head);
   if(head.x===s.apple.x&&head.y===s.apple.y){
     s.score++;setScoreBar([{label:'Score',val:s.score,color:'#10b981'},{label:'Best',val:getBest('snake'),color:'#f59e0b'}]);
@@ -1500,72 +1502,115 @@ function drawSnake(){
 }
 
 // ─────────────────── BREAKOUT ───────────────────
-function initBreakout(){
-  const diff=getDiff('breakout');
-  const rows=diff==='easy'?3:diff==='hard'?6:4,cols=8;
-  const W=cW(),H=cH();
+function buildBreakoutLevel(b){
+  // Build bricks for current level — each level adds a row, alternating hard bricks (need 2 hits)
+  const W=cW();
+  const cols=8;
+  const baseRows=b.baseRows;
+  const rows=Math.min(baseRows+b.level-1, 9); // cap at 9 rows so bricks don't crowd dino area
   const bW=(W-20)/cols-4,bH=18;
   const bricks=[];
-  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
-    const colors=['#ff3d6e','#ff7a00','#f59e0b','#10b981','#0ea5e9','#7c3aed'];
-    bricks.push({x:10+c*(bW+4),y:40+r*(bH+5),w:bW,h:bH,alive:true,color:colors[r%6]});
+  const colors=['#ff3d6e','#ff7a00','#f59e0b','#10b981','#0ea5e9','#7c3aed'];
+  for(let r=0;r<rows;r++)for(let col=0;col<cols;col++){
+    // Every 3rd level top row is a hard brick (needs 2 hits)
+    const hard=b.level>=3&&r===0;
+    bricks.push({x:10+col*(bW+4),y:40+r*(bH+5),w:bW,h:bH,alive:true,color:colors[r%6],hits:hard?2:1,maxHits:hard?2:1});
   }
-  const speed=diff==='easy'?3.5:diff==='hard'?5.5:4.5;
-  const pdW=diff==='easy'?90:diff==='hard'?55:70;
+  return bricks;
+}
+function initBreakout(){
+  const diff=getDiff('breakout');
+  const baseRows=diff==='easy'?3:diff==='hard'?6:4;
+  const baseSpeed=diff==='easy'?3.5:diff==='hard'?5.5:4.5;
+  const basePdW=diff==='easy'?90:diff==='hard'?55:70;
+  const W=cW(),H=cH();
   gameState.breakout={
-    ball:{x:W/2,y:H-80,vx:speed*(Math.random()>.5?1:-1),vy:-speed,r:7},
-    paddle:{x:W/2-pdW/2,y:H-30,w:pdW,h:12},
-    bricks,score:0,
-    keys:{left:false,right:false},touch:{x:null},
+    level:1,score:0,baseRows,baseSpeed,basePdW,diff,
+    ball:{x:W/2,y:H-80,vx:baseSpeed*(Math.random()>.5?1:-1),vy:-baseSpeed,r:7},
+    paddle:{x:W/2-basePdW/2,y:H-30,w:basePdW,h:12},
+    bricks:[],keys:{left:false,right:false},
+    _rewarded:false,
   };
-  setScoreBar([{label:'Bricks',val:bricks.length,color:'#f59e0b'},{label:'Score',val:0,color:'#ff3d6e'}]);
+  const b=gameState.breakout;
+  b.bricks=buildBreakoutLevel(b);
+  setScoreBar([{label:'Lvl',val:b.level,color:'#7c3aed'},{label:'Bricks',val:b.bricks.length,color:'#f59e0b'},{label:'Score',val:0,color:'#ff3d6e'}]);
   setupMobileControls([
     {label:'◀',id:'bl',onStart:()=>gameState.breakout.keys.left=true,onEnd:()=>gameState.breakout.keys.left=false},
     {label:'▶',id:'br',onStart:()=>gameState.breakout.keys.right=true,onEnd:()=>gameState.breakout.keys.right=false},
   ]);
-  // Touch move
   const cv=getCanvas();
   cv.addEventListener('touchmove',e=>{
     e.preventDefault();
-    const r=cv.getBoundingClientRect();
-    const tx=(e.touches[0].clientX-r.left)*(cW()/r.width);
+    const r2=cv.getBoundingClientRect();
+    const tx=(e.touches[0].clientX-r2.left)*(cW()/r2.width);
     gameState.breakout.paddle.x=Math.max(0,Math.min(cW()-gameState.breakout.paddle.w,tx-gameState.breakout.paddle.w/2));
   },{passive:false});
-  document.getElementById('desktopHint').textContent='⌨️ ←/→ or A/D keys · Mouse also works · Clear all bricks to win!';
-  // Mouse
+  document.getElementById('desktopHint').textContent='⌨️ ←/→ or A/D · Mouse/touch · Clear all bricks to advance levels!';
   cv.addEventListener('mousemove',e=>{
     if(!gameRunning)return;
-    const r=cv.getBoundingClientRect();
-    const mx=(e.clientX-r.left)*(cW()/r.width);
+    const r2=cv.getBoundingClientRect();
+    const mx=(e.clientX-r2.left)*(cW()/r2.width);
     gameState.breakout.paddle.x=Math.max(0,Math.min(cW()-gameState.breakout.paddle.w,mx-gameState.breakout.paddle.w/2));
   });
   drawBreakout();
 }
+function advanceBreakoutLevel(){
+  const b=gameState.breakout,W=cW(),H=cH();
+  b.level++;
+  // Speed up ball by 8% per level, no hard cap
+  const spd=b.baseSpeed*Math.pow(1.08,b.level-1);
+  const angle=(Math.random()>.5?1:-1)*(0.4+Math.random()*0.3);
+  b.ball={x:W/2,y:H-80,vx:spd*Math.sin(angle),vy:-spd*Math.cos(angle),r:7};
+  // Shrink paddle by 5px per level, min 35px
+  b.paddle.w=Math.max(35,b.basePdW-5*(b.level-1));
+  b.paddle.x=W/2-b.paddle.w/2;
+  b.bricks=buildBreakoutLevel(b);
+  setScoreBar([{label:'Lvl',val:b.level,color:'#7c3aed'},{label:'Bricks',val:b.bricks.filter(x=>x.alive).length,color:'#f59e0b'},{label:'Score',val:b.score,color:'#ff3d6e'}]);
+  // Flash level banner
+  const banner=document.createElement('div');
+  banner.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#7c3aed;color:white;font-family:Fredoka One,cursive;font-size:2rem;padding:16px 36px;border-radius:24px;z-index:9999;box-shadow:0 4px 30px rgba(0,0,0,.5);pointer-events:none';
+  banner.textContent=`🧱 Level ${b.level}!`;
+  document.body.appendChild(banner);
+  setTimeout(()=>banner.remove(),1200);
+}
 function updateBreakout(){
-  const b=gameState.breakout,W=cW(),H=cH(),s=5.5;
-  if(b.keys.left)b.paddle.x=Math.max(0,b.paddle.x-s);
-  if(b.keys.right)b.paddle.x=Math.min(W-b.paddle.w,b.paddle.x+s);
+  const b=gameState.breakout,W=cW(),H=cH(),ps=6;
+  if(b.keys.left)b.paddle.x=Math.max(0,b.paddle.x-ps);
+  if(b.keys.right)b.paddle.x=Math.min(W-b.paddle.w,b.paddle.x+ps);
   b.ball.x+=b.ball.vx;b.ball.y+=b.ball.vy;
   if(b.ball.x-b.ball.r<0){b.ball.x=b.ball.r;b.ball.vx=Math.abs(b.ball.vx);}
   if(b.ball.x+b.ball.r>W){b.ball.x=W-b.ball.r;b.ball.vx=-Math.abs(b.ball.vx);}
   if(b.ball.y-b.ball.r<0){b.ball.y=b.ball.r;b.ball.vy=Math.abs(b.ball.vy);}
   if(b.ball.y+b.ball.r>H){onGameEnd(b.score);return;}
-  // Paddle
-  if(b.ball.y+b.ball.r>b.paddle.y&&b.ball.y-b.ball.r<b.paddle.y+b.paddle.h&&b.ball.x>b.paddle.x&&b.ball.x<b.paddle.x+b.paddle.w){
+  // Paddle hit
+  if(b.ball.y+b.ball.r>b.paddle.y&&b.ball.y-b.ball.r<b.paddle.y+b.paddle.h&&
+     b.ball.x>b.paddle.x&&b.ball.x<b.paddle.x+b.paddle.w){
     b.ball.vy=-Math.abs(b.ball.vy);
     const rel=(b.ball.x-(b.paddle.x+b.paddle.w/2))/(b.paddle.w/2);
-    b.ball.vx=rel*6;
+    b.ball.vx=rel*7;
   }
-  // Bricks
+  // Brick hits
+  let levelCleared=true;
   b.bricks.forEach(brick=>{
     if(!brick.alive)return;
-    if(b.ball.x+b.ball.r>brick.x&&b.ball.x-b.ball.r<brick.x+brick.w&&b.ball.y+b.ball.r>brick.y&&b.ball.y-b.ball.r<brick.y+brick.h){
-      brick.alive=false;b.score+=10;b.ball.vy*=-1;
+    levelCleared=false;
+    if(b.ball.x+b.ball.r>brick.x&&b.ball.x-b.ball.r<brick.x+brick.w&&
+       b.ball.y+b.ball.r>brick.y&&b.ball.y-b.ball.r<brick.y+brick.h){
+      brick.hits--;
+      b.ball.vy*=-1;
+      if(brick.hits<=0){
+        brick.alive=false;
+        b.score+=brick.maxHits===2?20:10; // hard bricks worth more
+      }
       const alive=b.bricks.filter(x=>x.alive).length;
-      setScoreBar([{label:'Bricks',val:alive,color:'#f59e0b'},{label:'Score',val:b.score,color:'#ff3d6e'}]);
-      if(alive===0){onGameEnd(b.score);return;}
+      setScoreBar([{label:'Lvl',val:b.level,color:'#7c3aed'},{label:'Bricks',val:alive,color:'#f59e0b'},{label:'Score',val:b.score,color:'#ff3d6e'}]);
     }
   });
+  // Check if all bricks cleared — advance level
+  if(b.bricks.length>0&&b.bricks.every(br=>!br.alive)){
+    if(!b._rewarded){onGameWin(b.score);} // give reward on first clear
+    advanceBreakoutLevel();
+  }
   drawBreakout();
 }
 function drawBreakout(){
@@ -1574,9 +1619,19 @@ function drawBreakout(){
   ctx.fillStyle='#1a2744';ctx.fillRect(0,0,W,H);
   b.bricks.forEach(brick=>{
     if(!brick.alive)return;
+    // Dim hard bricks that have been hit once
+    const alpha=brick.hits<brick.maxHits?0.5:1;
+    ctx.globalAlpha=alpha;
     ctx.fillStyle=brick.color;ctx.shadowColor=brick.color;ctx.shadowBlur=8;
     if(ctx.roundRect){ctx.beginPath();ctx.roundRect(brick.x,brick.y,brick.w,brick.h,4);ctx.fill();}
     else ctx.fillRect(brick.x,brick.y,brick.w,brick.h);
+    // Crack mark on hard bricks
+    if(brick.maxHits===2){
+      ctx.globalAlpha=1;
+      ctx.strokeStyle='rgba(255,255,255,0.6)';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo(brick.x+brick.w*0.35,brick.y+2);ctx.lineTo(brick.x+brick.w*0.5,brick.y+brick.h-2);ctx.stroke();
+    }
+    ctx.globalAlpha=1;
   });
   ctx.shadowBlur=0;
   // Paddle
@@ -1737,18 +1792,7 @@ function updateDino(){
     if(o.x+o.w<0){
       d.score++;
       setScoreBar([{label:'Score',val:d.score,color:'#ff7a00'},{label:'Best',val:getBest('dino'),color:'#f59e0b'}]);
-      // Award jump points to player
-      const jumpPts=state.dinoJumpPts||1;
-      if(jumpPts>0&&currentGameKidId&&!String(currentGameKidId).startsWith('staff_')){
-        const k=getKid(currentGameKidId);
-        // Cap dino bonus at 3 pts per session (same as edu win reward)
-        if(k&&(d._dinoBonus||0)<3){
-          const give=Math.min(jumpPts,3-(d._dinoBonus||0));
-          d._dinoBonus=(d._dinoBonus||0)+give;
-          k.points+=give;k.pointLog.unshift({amount:give,reason:`🦕 Dino jump! (${d._dinoBonus}/3 max)`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
-        }
-        document.getElementById('arcadePtsBadge').textContent=`${k?.emoji||''} ${k?.name||''} · ${k?.points||0} ⭐`;
-      }
+      // No per-obstacle points — reward only comes from onGameWin at win threshold
       if(d.score>=d.WIN&&!d._rewarded){onGameWin(d.score);}
       // Every 5 obstacles: speed up with no cap, and tighten spawn interval
       if(d.score>0&&d.score%5===0){
