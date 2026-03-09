@@ -1186,8 +1186,14 @@ function setScoreBar(items){
 function onGameWin(score){
   const isStaff=String(currentGameKidId).startsWith('staff_');
   // Mark reward as given on the active gameState so we don't double-reward
+  // Check persistent daily reward flag (survives page reload)
+  const today=new Date().toISOString().slice(0,10);
+  const rewardKey=`gameReward_${currentGameKidId}_${currentGameId}_${today}`;
+  if(!state._gameRewards)state._gameRewards={};
+  if(state._gameRewards[rewardKey])return; // already rewarded today
+  state._gameRewards[rewardKey]=true;
+  // Also set in-memory flag
   const gs=gameState[currentGameId]||gameState;
-  if(gs&&gs._rewarded)return; // already rewarded this session
   if(gs)gs._rewarded=true;
 
   if(isStaff){
@@ -1262,12 +1268,17 @@ function onGameEnd(score){
     saveState();return;
   }
   // Arcade game over
-  showOverlay('😢','Game Over!',`Final Score: ${score}${alreadyRewarded?' · Points already earned!':' · Point was used.'}` ,'Try Again (1 ⭐)',()=>{
-    if(kid.points<1){showOverlay('😢','No Points','Earn more by doing chores!','Go Back',exitGame);return;}
-    kid.points=Math.max(0,kid.points-1);
-    kid.pointLog.unshift({amount:-1,reason:`🎮 Played ${g.name}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
-    document.getElementById('arcadePtsBadge').textContent=`${kid.emoji} ${kid.name} · ${kid.points} ⭐`;
+  showOverlay('😢','Game Over!',`Final Score: ${score}${alreadyRewarded?' · Points already earned today!':' · Point was used.'}` ,'Try Again (1 ⭐)',()=>{
+    const kid2=getKid(currentGameKidId);
+    if(!kid2||kid2.points<1){showOverlay('😢','No Points','Earn more by doing chores!','Go Back',exitGame);return;}
+    kid2.points=Math.max(0,kid2.points-1);
+    kid2.pointLog.unshift({amount:-1,reason:`🎮 Played ${g.name}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+    document.getElementById('arcadePtsBadge').textContent=`${kid2.emoji} ${kid2.name} · ${kid2.points} ⭐`;
+    const today2=new Date().toISOString().slice(0,10);
+    const rk=`gameReward_${currentGameKidId}_${currentGameId}_${today2}`;
+    const won=!!(state._gameRewards||{})[rk];
     initGame(currentGameId);startCurrentGame();
+    if(won&&gameState[currentGameId])gameState[currentGameId]._rewarded=true;
   });
   saveState();
 }
@@ -1284,7 +1295,15 @@ function eduPlayAgain(){
   kid.points=Math.max(0,kid.points-1);
   kid.pointLog.unshift({amount:-1,reason:`🧠 Played ${g.name}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
   document.getElementById('arcadePtsBadge').textContent=`${kid.emoji} ${kid.name} · ${kid.points} ⭐`;
-  saveState();initGame(currentGameId);
+  // Preserve _rewarded across play-agains within the same day
+  const today=new Date().toISOString().slice(0,10);
+  const rewardKey=`gameReward_${currentGameKidId}_${currentGameId}_${today}`;
+  if(!state._gameRewards)state._gameRewards={};
+  const alreadyWon=!!state._gameRewards[rewardKey];
+  saveState();
+  initGame(currentGameId);
+  // Restore in-memory rewarded flag if already earned today
+  if(alreadyWon&&gameState[currentGameId])gameState[currentGameId]._rewarded=true;
 }
 
 function getCanvas(){return document.getElementById('gameCanvas');}
@@ -1722,7 +1741,12 @@ function updateDino(){
       const jumpPts=state.dinoJumpPts||1;
       if(jumpPts>0&&currentGameKidId&&!String(currentGameKidId).startsWith('staff_')){
         const k=getKid(currentGameKidId);
-        if(k){k.points+=jumpPts;k.pointLog.unshift({amount:jumpPts,reason:`🦕 Dino jump!`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});}
+        // Cap dino bonus at 3 pts per session (same as edu win reward)
+        if(k&&(d._dinoBonus||0)<3){
+          const give=Math.min(jumpPts,3-(d._dinoBonus||0));
+          d._dinoBonus=(d._dinoBonus||0)+give;
+          k.points+=give;k.pointLog.unshift({amount:give,reason:`🦕 Dino jump! (${d._dinoBonus}/3 max)`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+        }
         document.getElementById('arcadePtsBadge').textContent=`${k?.emoji||''} ${k?.name||''} · ${k?.points||0} ⭐`;
       }
       if(d.score>=d.WIN&&!d._rewarded){onGameWin(d.score);}
@@ -2494,26 +2518,118 @@ function memSubmit(gid){
 // ─────────────────── ODD ONE OUT 🔍 ───────────────────
 // Lives: 3 wrong = lose
 const ODD_SETS=[
+  // Animals & Nature
   {cat:'🐾 Animals',items:['Dog','Cat','Fish','Hammer'],odd:'Hammer'},
-  {cat:'🍎 Fruits',items:['Apple','Banana','Carrot','Grape'],odd:'Carrot'},
-  {cat:'🔢 Numbers',items:['2','4','7','8'],odd:'7',hint:'not even'},
-  {cat:'🌍 Countries',items:['France','Germany','Sushi','Italy'],odd:'Sushi'},
-  {cat:'🎨 Colors',items:['Red','Blue','Tuesday','Green'],odd:'Tuesday'},
-  {cat:'🚗 Transport',items:['Car','Bus','Train','Mountain'],odd:'Mountain'},
-  {cat:'⚽ Sports',items:['Soccer','Tennis','Chess','Basketball'],odd:'Chess',hint:'not a physical sport'},
-  {cat:'🌡️ Weather',items:['Sunny','Rainy','Cloudy','Monday'],odd:'Monday'},
-  {cat:'🔢 Primes',items:['2','3','5','9'],odd:'9',hint:'not prime'},
-  {cat:'📚 School',items:['Math','Science','Recess','English'],odd:'Recess'},
-  {cat:'🍕 Food',items:['Pizza','Burger','Pencil','Taco'],odd:'Pencil'},
-  {cat:'🎵 Music',items:['Guitar','Piano','Violin','Hammer'],odd:'Hammer'},
-  {cat:'🔢 Squares',items:['4','9','16','14'],odd:'14',hint:'not a perfect square'},
+  {cat:'🦁 Wild Animals',items:['Lion','Tiger','Bear','Daisy'],odd:'Daisy'},
+  {cat:'🐦 Birds',items:['Eagle','Parrot','Penguin','Salmon'],odd:'Salmon',hint:'not a bird'},
   {cat:'🌊 Ocean',items:['Shark','Whale','Eagle','Dolphin'],odd:'Eagle'},
-  {cat:'🏠 Furniture',items:['Chair','Table','Sofa','Apple'],odd:'Apple'},
-  {cat:'❄️ Cold things',items:['Snow','Ice','Fire','Frost'],odd:'Fire'},
+  {cat:'🦋 Insects',items:['Ant','Bee','Butterfly','Snake'],odd:'Snake',hint:'not an insect'},
+  {cat:'🐾 Mammals',items:['Dog','Dolphin','Bat','Salmon'],odd:'Salmon',hint:'not a mammal'},
+  {cat:'🌿 Plants',items:['Rose','Oak','Fern','Granite'],odd:'Granite',hint:'not a plant'},
+  {cat:'🐠 Fish',items:['Tuna','Salmon','Clownfish','Frog'],odd:'Frog',hint:'not a fish'},
+  {cat:'🦎 Reptiles',items:['Snake','Lizard','Turtle','Frog'],odd:'Frog',hint:'not a reptile'},
+  {cat:'🌸 Flowers',items:['Rose','Tulip','Daisy','Cabbage'],odd:'Cabbage',hint:'not a flower'},
+  // Food & Drink
+  {cat:'🍎 Fruits',items:['Apple','Banana','Carrot','Grape'],odd:'Carrot'},
+  {cat:'🥦 Vegetables',items:['Carrot','Broccoli','Spinach','Mango'],odd:'Mango',hint:'not a vegetable'},
+  {cat:'🍕 Food',items:['Pizza','Burger','Pencil','Taco'],odd:'Pencil'},
+  {cat:'🥤 Drinks',items:['Water','Juice','Milk','Bread'],odd:'Bread',hint:'not a drink'},
+  {cat:'🍊 Citrus fruits',items:['Orange','Lemon','Lime','Apple'],odd:'Apple',hint:'not citrus'},
+  {cat:'🧁 Sweet things',items:['Cake','Candy','Cookie','Broccoli'],odd:'Broccoli'},
+  {cat:'🥛 Dairy',items:['Milk','Cheese','Yoghurt','Orange'],odd:'Orange',hint:'not dairy'},
+  {cat:'🌮 Mexican food',items:['Taco','Burrito','Salsa','Sushi'],odd:'Sushi'},
+  {cat:'🍞 Baked goods',items:['Bread','Muffin','Croissant','Steak'],odd:'Steak'},
+  {cat:'🥩 Proteins',items:['Chicken','Beef','Tofu','Carrot'],odd:'Carrot'},
+  // Colors & Shapes
+  {cat:'🎨 Colors',items:['Red','Blue','Tuesday','Green'],odd:'Tuesday'},
+  {cat:'🌈 Primary colors',items:['Red','Yellow','Blue','Purple'],odd:'Purple',hint:'not a primary color'},
+  {cat:'🔷 Shapes',items:['Circle','Square','Triangle','Monday'],odd:'Monday'},
+  {cat:'🔺 3D shapes',items:['Cube','Sphere','Pyramid','Square'],odd:'Square',hint:'not 3D'},
+  {cat:'🌑 Dark colors',items:['Black','Navy','Maroon','Yellow'],odd:'Yellow',hint:'not dark'},
+  // Math & Numbers
+  {cat:'🔢 Even numbers',items:['2','4','7','8'],odd:'7',hint:'not even'},
+  {cat:'🔢 Primes',items:['2','3','5','9'],odd:'9',hint:'not prime'},
+  {cat:'🔢 Squares',items:['4','9','16','14'],odd:'14',hint:'not a perfect square'},
   {cat:'🔢 Multiples of 3',items:['6','9','10','12'],odd:'10'},
+  {cat:'🔢 Multiples of 5',items:['5','10','15','17'],odd:'17'},
+  {cat:'🔢 Odd numbers',items:['1','3','6','7'],odd:'6',hint:'not odd'},
+  {cat:'🔢 Multiples of 4',items:['4','8','14','16'],odd:'14'},
+  {cat:'🔢 Cube numbers',items:['8','27','64','25'],odd:'25',hint:'not a perfect cube'},
+  {cat:'🔢 Fractions less than 1',items:['½','¼','¾','5/4'],odd:'5/4',hint:'not less than 1'},
+  {cat:'🔢 Negative numbers',items:['-3','-7','5','-12'],odd:'5',hint:'not negative'},
+  // Science & Space
   {cat:'🪐 Planets',items:['Mars','Venus','Moon','Jupiter'],odd:'Moon',hint:'not a planet'},
-  {cat:'👨‍🍳 Kitchen',items:['Spoon','Fork','Knife','Hammer'],odd:'Hammer'},
+  {cat:'⭐ Stars',items:['Sun','Sirius','Betelgeuse','Moon'],odd:'Moon',hint:'not a star'},
+  {cat:'🔬 Elements',items:['Gold','Silver','Iron','Water'],odd:'Water',hint:'not an element'},
+  {cat:'🧲 States of matter',items:['Solid','Liquid','Gas','Energy'],odd:'Energy',hint:'not a state of matter'},
+  {cat:'☀️ Solar system',items:['Mercury','Venus','Earth','Moon'],odd:'Moon',hint:'not a planet'},
+  {cat:'🔭 Space objects',items:['Planet','Star','Galaxy','Volcano'],odd:'Volcano',hint:'not in space'},
+  {cat:'⚡ Energy types',items:['Solar','Wind','Nuclear','Pizza'],odd:'Pizza'},
+  {cat:'🌡️ Weather',items:['Sunny','Rainy','Cloudy','Monday'],odd:'Monday'},
+  {cat:'🌋 Earth features',items:['Mountain','River','Ocean','Cloud'],odd:'Cloud',hint:'not on the ground'},
+  {cat:'🌊 Water bodies',items:['Ocean','River','Lake','Desert'],odd:'Desert',hint:'not water'},
+  // Countries & Geography
+  {cat:'🌍 Countries',items:['France','Germany','Sushi','Italy'],odd:'Sushi'},
+  {cat:'🌎 South American countries',items:['Brazil','Peru','Chile','Spain'],odd:'Spain',hint:'not in South America'},
+  {cat:'🌏 Asian countries',items:['Japan','China','India','Egypt'],odd:'Egypt',hint:'not in Asia'},
+  {cat:'🗼 Capital cities',items:['Paris','London','Berlin','Everest'],odd:'Everest',hint:'not a capital'},
+  {cat:'🌍 African countries',items:['Kenya','Nigeria','Ghana','Morocco'],odd:'Morocco',hint:'all African actually — trick!'},
+  {cat:'🏔️ Mountain ranges',items:['Himalayas','Alps','Rockies','Amazon'],odd:'Amazon',hint:'not mountains'},
+  {cat:'🌊 Oceans',items:['Pacific','Atlantic','Indian','Mediterranean'],odd:'Mediterranean',hint:'a sea, not an ocean'},
+  {cat:'🗺️ European countries',items:['Spain','Italy','Portugal','Australia'],odd:'Australia',hint:'not European'},
+  // Sports & Activities
+  {cat:'⚽ Sports',items:['Soccer','Tennis','Chess','Basketball'],odd:'Chess',hint:'not a physical sport'},
+  {cat:'🏊 Water sports',items:['Swimming','Surfing','Rowing','Tennis'],odd:'Tennis'},
+  {cat:'🏃 Olympic sports',items:['Running','Cycling','Judo','Checkers'],odd:'Checkers',hint:'not Olympic'},
+  {cat:'🎯 Target sports',items:['Archery','Darts','Bowling','Football'],odd:'Football',hint:'not a target sport'},
+  {cat:'🏀 Ball sports',items:['Basketball','Soccer','Volleyball','Chess'],odd:'Chess'},
+  {cat:'⛷️ Winter sports',items:['Skiing','Snowboard','Ice skate','Surfing'],odd:'Surfing'},
+  {cat:'🥊 Combat sports',items:['Boxing','Wrestling','Judo','Tennis'],odd:'Tennis'},
+  {cat:'🚴 Cycling events',items:['Tour de France','BMX','Track cycling','Marathon'],odd:'Marathon',hint:'not cycling'},
+  // School & Learning
+  {cat:'📚 School',items:['Math','Science','Recess','English'],odd:'Recess'},
+  {cat:'📐 Math topics',items:['Algebra','Geometry','Calculus','Poetry'],odd:'Poetry'},
+  {cat:'🔬 Science branches',items:['Biology','Chemistry','Physics','History'],odd:'History'},
+  {cat:'📖 Languages',items:['English','Spanish','French','Math'],odd:'Math'},
+  {cat:'🎨 Art tools',items:['Brush','Canvas','Pencil','Calculator'],odd:'Calculator'},
+  {cat:'📝 Writing tools',items:['Pen','Pencil','Marker','Scissors'],odd:'Scissors',hint:'not for writing'},
+  // Music & Arts
+  {cat:'🎵 Music',items:['Guitar','Piano','Violin','Hammer'],odd:'Hammer'},
+  {cat:'🥁 Percussion',items:['Drums','Xylophone','Tambourine','Trumpet'],odd:'Trumpet',hint:'not percussion'},
+  {cat:'🎻 String instruments',items:['Violin','Cello','Guitar','Trumpet'],odd:'Trumpet',hint:'not a string instrument'},
+  {cat:'🎷 Wind instruments',items:['Flute','Saxophone','Trumpet','Piano'],odd:'Piano',hint:'not a wind instrument'},
+  {cat:'🎼 Music terms',items:['Tempo','Rhythm','Melody','Equation'],odd:'Equation'},
+  {cat:'🎭 Art forms',items:['Painting','Sculpture','Dance','Cement'],odd:'Cement'},
+  // Transport & Technology
+  {cat:'🚗 Transport',items:['Car','Bus','Train','Mountain'],odd:'Mountain'},
+  {cat:'✈️ Air transport',items:['Plane','Helicopter','Balloon','Submarine'],odd:'Submarine'},
+  {cat:'🚢 Water transport',items:['Boat','Ship','Ferry','Train'],odd:'Train'},
+  {cat:'🚀 Space vehicles',items:['Rocket','Space shuttle','Satellite','Submarine'],odd:'Submarine'},
+  {cat:'💻 Tech devices',items:['Laptop','Phone','Tablet','Hammer'],odd:'Hammer'},
+  {cat:'⚡ Electricity',items:['Wire','Battery','Switch','Bucket'],odd:'Bucket'},
+  // Time & Calendar
+  {cat:'📅 Days',items:['Monday','Tuesday','Sunday','January'],odd:'January',hint:'not a day'},
+  {cat:'🗓️ Months',items:['January','March','June','Tuesday'],odd:'Tuesday',hint:'not a month'},
+  {cat:'🌸 Spring months',items:['March','April','May','December'],odd:'December'},
+  {cat:'❄️ Winter months',items:['December','January','February','July'],odd:'July'},
+  {cat:'⏱️ Time units',items:['Second','Minute','Hour','Meter'],odd:'Meter',hint:'not time'},
+  // Emotions & People
   {cat:'🎭 Emotions',items:['Happy','Sad','Angry','Running'],odd:'Running'},
+  {cat:'😊 Positive emotions',items:['Joy','Excitement','Love','Fear'],odd:'Fear',hint:'not positive'},
+  {cat:'👪 Family members',items:['Mother','Father','Sister','Neighbor'],odd:'Neighbor',hint:'not immediate family'},
+  {cat:'👔 Jobs',items:['Doctor','Teacher','Engineer','Elephant'],odd:'Elephant'},
+  {cat:'🏠 Furniture',items:['Chair','Table','Sofa','Apple'],odd:'Apple'},
+  // Random fun
+  {cat:'❄️ Cold things',items:['Snow','Ice','Fire','Frost'],odd:'Fire'},
+  {cat:'🔥 Hot things',items:['Sun','Fire','Lava','Ice'],odd:'Ice'},
+  {cat:'👨‍🍳 Kitchen',items:['Spoon','Fork','Knife','Hammer'],odd:'Hammer'},
+  {cat:'🔑 Things with keys',items:['Piano','Computer','Lock','Banana'],odd:'Banana'},
+  {cat:'📱 App types',items:['Game','Map','Camera','Sandwich'],odd:'Sandwich'},
+  {cat:'🌙 Nocturnal animals',items:['Owl','Bat','Fox','Butterfly'],odd:'Butterfly',hint:'active in daytime'},
+  {cat:'🍄 Things in a forest',items:['Tree','Mushroom','Moss','Submarine'],odd:'Submarine'},
+  {cat:'🎃 Halloween things',items:['Pumpkin','Ghost','Witch','Surfboard'],odd:'Surfboard'},
+  {cat:'🎄 Christmas things',items:['Tree','Tinsel','Santa','Bikini'],odd:'Bikini'},
+  {cat:'🔑 Things that open',items:['Door','Jar','Book','Rock'],odd:'Rock'},
 ];
 function initOddOneOut(){
   gameRunning=true;
@@ -2581,26 +2697,109 @@ function oddAnswer(chosen,gid){
 // ─────────────────── QUIZ BLITZ ❓ ───────────────────
 // Lives: 3 wrong = lose
 const BUILT_IN_QUIZ=[
+  // 🌍 Geography
   {q:'What is the capital of France?',options:['Paris','London','Rome','Berlin'],answer:0,cat:'🌍 Geography'},
-  {q:'How many sides does a hexagon have?',options:['5','6','7','8'],answer:1,cat:'🔢 Math'},
-  {q:'What planet is closest to the Sun?',options:['Venus','Earth','Mercury','Mars'],answer:2,cat:'🪐 Science'},
-  {q:'What is 7 × 8?',options:['54','56','63','48'],answer:1,cat:'🔢 Math'},
-  {q:'Which animal is the largest?',options:['Elephant','Blue Whale','Giraffe','Hippo'],answer:1,cat:'🐾 Animals'},
   {q:'How many continents are there?',options:['5','6','7','8'],answer:2,cat:'🌍 Geography'},
-  {q:'What gas do plants breathe in?',options:['Oxygen','Nitrogen','Carbon Dioxide','Hydrogen'],answer:2,cat:'🔬 Science'},
-  {q:'What is 144 ÷ 12?',options:['11','12','13','14'],answer:1,cat:'🔢 Math'},
   {q:'Which is the longest river in the world?',options:['Amazon','Mississippi','Nile','Yangtze'],answer:2,cat:'🌍 Geography'},
-  {q:'How many bones are in the human body?',options:['196','206','216','226'],answer:1,cat:'🔬 Science'},
-  {q:'What is the square root of 81?',options:['7','8','9','10'],answer:2,cat:'🔢 Math'},
   {q:'Which ocean is the largest?',options:['Atlantic','Indian','Arctic','Pacific'],answer:3,cat:'🌍 Geography'},
-  {q:'What is the chemical symbol for water?',options:['WA','H2O','HO','H2'],answer:1,cat:'🔬 Science'},
+  {q:'What is the capital of Australia?',options:['Sydney','Melbourne','Canberra','Brisbane'],answer:2,cat:'🌍 Geography'},
+  {q:'Which country has the most people?',options:['USA','India','China','Russia'],answer:1,cat:'🌍 Geography'},
+  {q:'What is the capital of Japan?',options:['Osaka','Kyoto','Hiroshima','Tokyo'],answer:3,cat:'🌍 Geography'},
+  {q:'Which is the largest country by area?',options:['USA','Canada','China','Russia'],answer:3,cat:'🌍 Geography'},
+  {q:'What is the capital of Brazil?',options:['Rio de Janeiro','São Paulo','Brasília','Salvador'],answer:2,cat:'🌍 Geography'},
+  {q:'Which mountain is the tallest in the world?',options:['K2','Kilimanjaro','Everest','Denali'],answer:2,cat:'🌍 Geography'},
+  {q:'How many countries are in Africa?',options:['44','54','64','74'],answer:1,cat:'🌍 Geography'},
+  {q:'What is the capital of Canada?',options:['Toronto','Vancouver','Montreal','Ottawa'],answer:3,cat:'🌍 Geography'},
+  {q:'Which desert is the largest in the world?',options:['Sahara','Arabian','Gobi','Antarctica'],answer:3,cat:'🌍 Geography'},
+  {q:'What is the capital of Germany?',options:['Munich','Hamburg','Frankfurt','Berlin'],answer:3,cat:'🌍 Geography'},
+  // 🔢 Math
+  {q:'How many sides does a hexagon have?',options:['5','6','7','8'],answer:1,cat:'🔢 Math'},
+  {q:'What is 7 × 8?',options:['54','56','63','48'],answer:1,cat:'🔢 Math'},
+  {q:'What is 144 ÷ 12?',options:['11','12','13','14'],answer:1,cat:'🔢 Math'},
+  {q:'What is the square root of 81?',options:['7','8','9','10'],answer:2,cat:'🔢 Math'},
   {q:'How many days in a leap year?',options:['364','365','366','367'],answer:2,cat:'🔢 Math'},
-  {q:'What is the fastest land animal?',options:['Lion','Cheetah','Horse','Leopard'],answer:1,cat:'🐾 Animals'},
-  {q:'How many players on a soccer team?',options:['9','10','11','12'],answer:2,cat:'⚽ Sports'},
   {q:'What is 15% of 200?',options:['20','25','30','35'],answer:2,cat:'🔢 Math'},
-  {q:'Which planet has rings?',options:['Jupiter','Mars','Saturn','Uranus'],answer:2,cat:'🪐 Science'},
-  {q:'What color is the sky on a clear day?',options:['Green','Blue','White','Gray'],answer:1,cat:'🔬 Science'},
   {q:'How many seconds in one minute?',options:['30','45','60','90'],answer:2,cat:'🔢 Math'},
+  {q:'What is 12 × 12?',options:['124','132','144','148'],answer:2,cat:'🔢 Math'},
+  {q:'What is 25% of 80?',options:['15','20','25','30'],answer:1,cat:'🔢 Math'},
+  {q:'What is the value of π (pi) to 2 decimal places?',options:['3.12','3.14','3.16','3.18'],answer:1,cat:'🔢 Math'},
+  {q:'How many degrees are in a right angle?',options:['45°','60°','90°','180°'],answer:2,cat:'🔢 Math'},
+  {q:'What is 2 to the power of 10?',options:['512','1000','1024','2048'],answer:2,cat:'🔢 Math'},
+  {q:'What is the perimeter of a square with side 7?',options:['21','28','35','49'],answer:1,cat:'🔢 Math'},
+  {q:'What is 1000 ÷ 8?',options:['105','115','125','135'],answer:2,cat:'🔢 Math'},
+  {q:'What is the area of a rectangle 6 × 9?',options:['30','45','54','63'],answer:2,cat:'🔢 Math'},
+  {q:'What is 17 × 3?',options:['48','51','54','57'],answer:1,cat:'🔢 Math'},
+  // 🔬 Science
+  {q:'What gas do plants breathe in?',options:['Oxygen','Nitrogen','Carbon Dioxide','Hydrogen'],answer:2,cat:'🔬 Science'},
+  {q:'How many bones are in the human body?',options:['196','206','216','226'],answer:1,cat:'🔬 Science'},
+  {q:'What is the chemical symbol for water?',options:['WA','H2O','HO','H2'],answer:1,cat:'🔬 Science'},
+  {q:'What color is the sky on a clear day?',options:['Green','Blue','White','Gray'],answer:1,cat:'🔬 Science'},
+  {q:'What is the hardest natural substance?',options:['Gold','Iron','Diamond','Quartz'],answer:2,cat:'🔬 Science'},
+  {q:'What organ pumps blood around the body?',options:['Lungs','Liver','Kidney','Heart'],answer:3,cat:'🔬 Science'},
+  {q:'How many chambers does the human heart have?',options:['2','3','4','5'],answer:2,cat:'🔬 Science'},
+  {q:'What is the speed of light (approx)?',options:['100,000 km/s','200,000 km/s','300,000 km/s','400,000 km/s'],answer:2,cat:'🔬 Science'},
+  {q:'What gas makes up most of the Earth atmosphere?',options:['Oxygen','Nitrogen','Carbon dioxide','Argon'],answer:1,cat:'🔬 Science'},
+  {q:'What is the boiling point of water in Celsius?',options:['90°','95°','100°','110°'],answer:2,cat:'🔬 Science'},
+  {q:'How many teeth does an adult human have?',options:['28','30','32','34'],answer:2,cat:'🔬 Science'},
+  {q:'What is the nearest star to Earth?',options:['Sirius','Alpha Centauri','The Sun','Betelgeuse'],answer:2,cat:'🔬 Science'},
+  {q:'What type of energy does the Sun produce?',options:['Chemical','Nuclear','Electrical','Mechanical'],answer:1,cat:'🔬 Science'},
+  {q:'How many chromosomes do humans have?',options:['23','44','46','48'],answer:2,cat:'🔬 Science'},
+  // 🪐 Space
+  {q:'What planet is closest to the Sun?',options:['Venus','Earth','Mercury','Mars'],answer:2,cat:'🪐 Space'},
+  {q:'Which planet has rings?',options:['Jupiter','Mars','Saturn','Uranus'],answer:2,cat:'🪐 Space'},
+  {q:'Which animal is the largest?',options:['Elephant','Blue Whale','Giraffe','Hippo'],answer:1,cat:'🐾 Animals'},
+  {q:'How many moons does Mars have?',options:['0','1','2','3'],answer:2,cat:'🪐 Space'},
+  {q:'What is the name of our galaxy?',options:['Andromeda','Milky Way','Whirlpool','Sombrero'],answer:1,cat:'🪐 Space'},
+  {q:'How long does Earth take to orbit the Sun?',options:['364 days','365 days','366 days','365.25 days'],answer:3,cat:'🪐 Space'},
+  {q:'Which planet is the largest in our solar system?',options:['Saturn','Neptune','Uranus','Jupiter'],answer:3,cat:'🪐 Space'},
+  {q:'What is a shooting star?',options:['A star moving fast','A falling planet','A meteor burning up','A comet'],answer:2,cat:'🪐 Space'},
+  {q:'How many planets are in our solar system?',options:['7','8','9','10'],answer:1,cat:'🪐 Space'},
+  {q:'What is the red planet?',options:['Venus','Jupiter','Mars','Mercury'],answer:2,cat:'🪐 Space'},
+  // 🐾 Animals
+  {q:'What is the fastest land animal?',options:['Lion','Cheetah','Horse','Leopard'],answer:1,cat:'🐾 Animals'},
+  {q:'How many legs does a spider have?',options:['6','7','8','10'],answer:2,cat:'🐾 Animals'},
+  {q:'What is a baby kangaroo called?',options:['Cub','Pup','Joey','Kitten'],answer:2,cat:'🐾 Animals'},
+  {q:'Which bird cannot fly?',options:['Eagle','Penguin','Sparrow','Parrot'],answer:1,cat:'🐾 Animals'},
+  {q:'How many legs does an insect have?',options:['4','6','8','10'],answer:1,cat:'🐾 Animals'},
+  {q:'What is the largest land animal?',options:['Giraffe','Hippo','Elephant','Rhino'],answer:2,cat:'🐾 Animals'},
+  {q:'Which animal can change its color?',options:['Shark','Chameleon','Eagle','Hippo'],answer:1,cat:'🐾 Animals'},
+  {q:'What do bees produce?',options:['Milk','Honey','Wax and Honey','Sugar'],answer:2,cat:'🐾 Animals'},
+  {q:'How long is a dog pregnant for (approx)?',options:['2 months','3 months','4 months','5 months'],answer:1,cat:'🐾 Animals'},
+  {q:'What is the only mammal that can fly?',options:['Flying squirrel','Bat','Eagle','Butterfly'],answer:1,cat:'🐾 Animals'},
+  // ⚽ Sports
+  {q:'How many players on a soccer team?',options:['9','10','11','12'],answer:2,cat:'⚽ Sports'},
+  {q:'How many points is a touchdown in American football?',options:['3','6','7','8'],answer:1,cat:'⚽ Sports'},
+  {q:'How long is an Olympic swimming pool?',options:['25m','50m','75m','100m'],answer:1,cat:'⚽ Sports'},
+  {q:'How many players on a basketball team?',options:['4','5','6','7'],answer:1,cat:'⚽ Sports'},
+  {q:'In tennis, what is the score after deuce if you win a point?',options:['Game','Advantage','30','40'],answer:1,cat:'⚽ Sports'},
+  {q:'How many holes are on a standard golf course?',options:['9','12','18','21'],answer:2,cat:'⚽ Sports'},
+  {q:'How many events are in a decathlon?',options:['8','9','10','12'],answer:2,cat:'⚽ Sports'},
+  {q:'What sport uses a puck?',options:['Soccer','Baseball','Ice Hockey','Lacrosse'],answer:2,cat:'⚽ Sports'},
+  {q:'How many rings are on the Olympic flag?',options:['3','4','5','6'],answer:2,cat:'⚽ Sports'},
+  {q:'In bowling, what is it called when you knock all pins in one go?',options:['Eagle','Strike','Ace','Spare'],answer:1,cat:'⚽ Sports'},
+  // 📖 History & Culture
+  {q:'Who painted the Mona Lisa?',options:['Picasso','Michelangelo','Da Vinci','Raphael'],answer:2,cat:'📖 History'},
+  {q:'In which year did World War II end?',options:['1943','1944','1945','1946'],answer:2,cat:'📖 History'},
+  {q:'Which ancient wonder was in Egypt?',options:['Colosseum','Great Wall','Great Pyramid','Parthenon'],answer:2,cat:'📖 History'},
+  {q:'Who was the first person on the Moon?',options:['Buzz Aldrin','Neil Armstrong','Yuri Gagarin','John Glenn'],answer:1,cat:'📖 History'},
+  {q:'What language has the most native speakers in the world?',options:['English','Spanish','Mandarin','Hindi'],answer:2,cat:'📖 History'},
+  {q:'How many sides does a pentagon have?',options:['4','5','6','7'],answer:1,cat:'🔢 Math'},
+  {q:'Who wrote Romeo and Juliet?',options:['Dickens','Shakespeare','Austen','Tolkien'],answer:1,cat:'📖 History'},
+  {q:'What year did humans first land on the Moon?',options:['1965','1967','1969','1971'],answer:2,cat:'📖 History'},
+  // 🎭 Pop Culture & Fun
+  {q:'How many colors are in a rainbow?',options:['5','6','7','8'],answer:2,cat:'🎭 Fun'},
+  {q:'What is the longest running animated TV show?',options:['Family Guy','South Park','The Simpsons','Futurama'],answer:2,cat:'🎭 Fun'},
+  {q:'How many strings does a standard guitar have?',options:['4','5','6','7'],answer:2,cat:'🎭 Fun'},
+  {q:'What is the most-sold book in history?',options:['Harry Potter','The Bible','The Quran','Don Quixote'],answer:1,cat:'🎭 Fun'},
+  {q:'How many keys are on a standard piano?',options:['72','76','88','96'],answer:2,cat:'🎭 Fun'},
+  {q:'What currency does Japan use?',options:['Won','Yuan','Baht','Yen'],answer:3,cat:'🌍 Geography'},
+  {q:'How many faces does a cube have?',options:['4','5','6','8'],answer:2,cat:'🔢 Math'},
+  {q:'What is the capital of Spain?',options:['Barcelona','Seville','Valencia','Madrid'],answer:3,cat:'🌍 Geography'},
+  {q:'What is 9 squared?',options:['72','81','90','99'],answer:1,cat:'🔢 Math'},
+  {q:'Which element has the symbol Fe?',options:['Fluorine','Francium','Iron','Fermium'],answer:2,cat:'🔬 Science'},
+  {q:'What is the capital of the USA?',options:['New York','Los Angeles','Chicago','Washington D.C.'],answer:3,cat:'🌍 Geography'},
+  {q:'How many days are in September?',options:['28','29','30','31'],answer:2,cat:'🔢 Math'},
+  {q:'What is the longest bone in the human body?',options:['Spine','Humerus','Femur','Tibia'],answer:2,cat:'🔬 Science'},
 ];
 function initQuizBlitz(){
   gameRunning=true;
@@ -3727,6 +3926,10 @@ function hydrateState(saved){
   if(!saved.messages)        saved.messages=[];
   if(!saved.todos)           saved.todos={};
   if(!saved.dayBoard)        saved.dayBoard=[];
+  if(!saved._gameRewards)    saved._gameRewards={};
+  // Prune old reward keys (keep only today's)
+  const _today=new Date().toISOString().slice(0,10);
+  Object.keys(saved._gameRewards).forEach(k=>{if(!k.endsWith(_today))delete saved._gameRewards[k];});
   if(!saved.needsList)       saved.needsList=[];
   if(!saved.gameWinScore)    saved.gameWinScore={pong:5,snake:10,breakout:0,space:0,dino:20,mathblast:10,memory:8,oddoneout:8,quiz:8};
   ['mathblast','memory','oddoneout','quiz'].forEach(id=>{if(saved.gameWinScore[id]===undefined)saved.gameWinScore[id]={mathblast:10,memory:8,oddoneout:8,quiz:8}[id];});
