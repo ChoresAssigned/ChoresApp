@@ -4536,7 +4536,17 @@ let _unsubscribe = null;
 
 // ── Serialise state (Dates → ISO strings) ──
 function serialiseState(){
-  return JSON.parse(JSON.stringify(state, (_k,v) => v instanceof Date ? v.toISOString() : v));
+  const raw = JSON.parse(JSON.stringify(state, (_k,v) => v instanceof Date ? v.toISOString() : v));
+  // Firebase drops null and {} — use sentinels so other devices see the reset
+  const dateSentinels=['loggedInAt','approvedAt','homeTime','morningStartTime','dinnerStartTime'];
+  if(raw.kids) raw.kids.forEach(k=>{
+    dateSentinels.forEach(f=>{ if(k[f]==null) k[f]=false; }); // false survives Firebase
+  });
+  // choreState: Firebase drops {} entirely — store a _cleared flag instead
+  if(!raw.choreState || Object.keys(raw.choreState).length===0){
+    raw.choreState = {_cleared: true};
+  }
+  return raw;
 }
 
 // ── Re-hydrate dates after reading from Firebase ──
@@ -4557,18 +4567,23 @@ function hydrateState(saved){
 
   if(saved.kids){
     saved.kids.forEach(k=>{
-      dateFields.forEach(f=>{ if(k[f]) k[f]=new Date(k[f]); });
+      // Restore date fields: false = sentinel for null (Firebase drops null)
+      dateFields.forEach(f=>{
+        if(k[f] && k[f]!==false) k[f]=new Date(k[f]);
+        else k[f]=null; // false sentinel OR missing = null
+      });
       if(!k.pointLog)     k.pointLog=[];
       if(!k.activityLog)  k.activityLog=[];
       k.pointLog    =toArr(k.pointLog);
       k.activityLog =toArr(k.activityLog);
-      if(k.morningStartTime===undefined) k.morningStartTime=null;
-      if(k.dinnerStartTime===undefined)  k.dinnerStartTime=null;
-      if(k.tidyChecked===undefined) k.tidyChecked=false;
-      if(k.tidySigned===undefined)  k.tidySigned=false;
+      if(k.tidyChecked===undefined||k.tidyChecked===null) k.tidyChecked=false;
+      if(k.tidySigned===undefined||k.tidySigned===null)   k.tidySigned=false;
     });
   }
-  if(saved.choreState){
+  // choreState: if missing OR sentinel _cleared flag → reset to empty
+  if(!saved.choreState || saved.choreState._cleared){
+    saved.choreState={};
+  } else {
     Object.values(saved.choreState).forEach(cs=>{
       if(cs.checkedAt) cs.checkedAt=new Date(cs.checkedAt);
     });
