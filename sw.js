@@ -1,7 +1,8 @@
-const CACHE = 'chore-champions-v1';
+const CACHE = 'chore-champions-v4';
 const ASSETS = [
   './',
   './index.html',
+  './manifest.json',
   'https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap',
 ];
 
@@ -22,12 +23,10 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
-  // ── Skip cross-origin requests (Cloudflare Worker, Firebase, Google Fonts CDN) ──
-  if (url.origin !== self.location.origin) {
-    return; // let the browser handle it natively
-  }
+  // Skip cross-origin — let Firebase, Cloudflare Worker, Google Fonts go through natively
+  if (url.origin !== self.location.origin) return;
 
-  // Network first for navigation
+  // Always network-first for navigation so fresh index.html is served
   if (e.request.mode === 'navigate') {
     e.respondWith(
       fetch(e.request).catch(() => caches.match('./index.html'))
@@ -35,10 +34,10 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Cache first for same-origin assets
+  // Cache-first for same-origin static assets
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
-      if (res && res.status === 200) {
+      if (res.ok) {
         const clone = res.clone();
         caches.open(CACHE).then(c => c.put(e.request, clone));
       }
