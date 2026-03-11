@@ -551,6 +551,19 @@ select.diff-sel{background:var(--surface2);border:2px solid var(--border);border
   </div>
 </div>
 
+<!-- ═══ RAFFLE SPIN MODAL ═══ -->
+<div class="modal-overlay" id="raffleSpinModal" style="z-index:1500">
+  <div class="modal-box" style="max-width:420px;text-align:center;overflow:hidden">
+    <h3 class="fredoka" style="font-size:1.6rem;margin-bottom:4px">🎟️ Weekly Raffle!</h3>
+    <div id="rafflePrizeLabel" style="font-size:.9rem;color:var(--muted);font-weight:800;margin-bottom:16px"></div>
+    <!-- Wheel canvas -->
+    <canvas id="raffleWheel" width="340" height="340" style="max-width:100%;display:block;margin:0 auto 16px"></canvas>
+    <div id="raffleSpinBtn" style="margin-bottom:12px"></div>
+    <div id="raffleWinnerBanner" style="display:none;padding:16px;background:linear-gradient(135deg,#ff7a00,#f59e0b);border-radius:16px;color:white;font-family:'Fredoka One',cursive;font-size:1.4rem;margin-bottom:12px"></div>
+    <button class="btn btn-outline" onclick="closeModal('raffleSpinModal')" style="width:100%">Close</button>
+  </div>
+</div>
+
 <!-- ═══ ACTIVITY LOG MODAL ═══ -->
 <div class="modal-overlay" id="activityLogModal" style="z-index:1200">
   <div class="modal-box" style="max-width:600px;max-height:85vh;display:flex;flex-direction:column">
@@ -656,6 +669,15 @@ let state={
   gameDifficulty:{pong:'medium',snake:'medium',breakout:'medium',space:'medium',dino:'medium',mathblast:'medium',memory:'medium',oddoneout:'medium',quiz:'medium'},
   // leaderboard: { gameId: [ {name, emoji, score, kidId} ] }  (top 5 per game)
   leaderboard:{pong:[],snake:[],breakout:[],space:[],dino:[]},
+  raffle:{
+    active:false,
+    prize:'',
+    weekLabel:'',
+    tickets:[],   // [{kidId,kidName,kidEmoji,cost,ts}]
+    winner:null,  // {kidId,kidName,kidEmoji,ts}
+    drawn:false,
+    history:[],   // [{weekLabel,prize,winner,ts}]
+  },
 };
 
 let session={type:null,id:null};
@@ -821,6 +843,7 @@ function buildTabs(type,id){
       {id:'messages',label:getMsgLabel(id),raw:true},
       {id:'dayboard',label:'📌 Board'},
       {id:'needs',label:'🛒 Needs'},
+      {id:'raffle',label:'🎟️ Raffle'},
       {id:'profile',label:'👤 Profile'},
     ];
   }
@@ -840,6 +863,7 @@ function buildTabs(type,id){
     const rwLabel=pendingReqs>0?`🎁 <span style="background:#ef4444;color:white;border-radius:10px;padding:1px 6px;font-size:.7rem">${pendingReqs}</span>`:'🎁 Rewards';
     tabs=[
       {id:'overview',label:'📊 Overview'},
+      {id:'raffle',label:'🎟️ Raffle'},
       {id:'rewards',label:rwLabel,raw:true},
       {id:'history',label:'📅 History'},
       {id:'messages',label:getMsgLabel('par_'+id),raw:true},
@@ -889,6 +913,7 @@ function renderTab(type,id){
     else if(activeTab==='dayboard')   c.innerHTML=renderDayBoard(false);
     else if(activeTab==='needs')      c.innerHTML=renderNeedsList(userKey,type);
     else if(activeTab==='profile')    c.innerHTML=renderKidProfile(id);
+    else if(activeTab==='raffle')     c.innerHTML=renderRaffleKid(id);
   } else if(type==='supervisor'){
     if(activeTab==='signoff')         c.innerHTML=renderSignOff();
     else if(activeTab==='messages')  {c.innerHTML=renderMessages(userKey);markMessagesRead(userKey);}
@@ -899,6 +924,7 @@ function renderTab(type,id){
     else c.innerHTML=renderKidChores(getKid(parseInt(activeTab.split('-')[1])));
   } else {
     if(activeTab==='overview')        c.innerHTML=renderParentOverview();
+    else if(activeTab==='raffle')     c.innerHTML=renderRaffleParent();
     else if(activeTab==='rewards')    c.innerHTML=renderRewards(true);
     else if(activeTab==='history')   {c.innerHTML='<div style="padding:16px"><button class="btn btn-primary" onclick="openHistoryModal()">📅 Open History Browser</button></div>';return;}
     else if(activeTab==='messages')  {c.innerHTML=renderMessages(userKey);markMessagesRead(userKey);}
@@ -4015,6 +4041,345 @@ function scheduleMidnightReset(){
   midnight.setHours(24,0,0,0);
   setTimeout(()=>{midnightReset();scheduleMidnightReset();},midnight-now);
 }
+// ═══════════════════════════════════════════════════════
+// RAFFLE SYSTEM 🎟️
+// ═══════════════════════════════════════════════════════
+
+// ── Kid view ─────────────────────────────────────────────
+function renderRaffleKid(kidId){
+  const kid=getKid(kidId);
+  const r=state.raffle||{};
+  if(!r.active){
+    return`<div style="text-align:center;padding:48px 20px">
+      <div style="font-size:4rem;margin-bottom:12px">🎟️</div>
+      <div style="font-family:'Fredoka One',cursive;font-size:1.5rem;color:var(--muted)">No raffle running</div>
+      <div style="font-size:.85rem;color:var(--muted);font-weight:700;margin-top:8px">Check back when a parent starts one!</div>
+    </div>`;
+  }
+
+  // How many tickets this kid has already bought this week
+  const myTickets=(r.tickets||[]).filter(t=>t.kidId===kidId);
+  const totalPot=(r.tickets||[]).reduce((s,t)=>s+t.cost,0);
+  const allEntrants=[...new Set((r.tickets||[]).map(t=>t.kidId))];
+
+  const prizeHtml=r.prize?`<div style="background:linear-gradient(135deg,#ff7a00,#f59e0b);color:white;border-radius:16px;padding:14px 20px;margin-bottom:16px;font-family:'Fredoka One',cursive;font-size:1.3rem">🏆 Prize: ${r.prize}</div>`:'';
+
+  const drawnHtml=r.drawn&&r.winner?`<div style="background:linear-gradient(135deg,#10b981,#059669);color:white;border-radius:16px;padding:16px;margin-bottom:16px;text-align:center">
+    <div style="font-size:2rem;margin-bottom:4px">${r.winner.kidEmoji}</div>
+    <div style="font-family:'Fredoka One',cursive;font-size:1.4rem">${r.winner.kidId===kidId?'🎉 YOU WON!':'🏆 '+r.winner.kidName+' won!'}</div>
+    <div style="font-size:.8rem;opacity:.85;margin-top:4px">The raffle has been drawn</div>
+  </div>`:'';
+
+  const ticketRows=myTickets.map(t=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface2);border-radius:10px;margin-bottom:6px">
+      <span style="font-size:1.3rem">🎟️</span>
+      <span style="font-weight:800;flex:1;margin-left:8px">${t.cost===2?'Golden Ticket':'Standard Ticket'}</span>
+      <span style="font-weight:800;color:#f59e0b">${t.cost} ⭐</span>
+    </div>`).join('');
+
+  const buyBtns=(!r.drawn)?`
+    <div style="margin-top:16px">
+      <div style="font-size:.82rem;font-weight:800;color:var(--muted);margin-bottom:8px">Buy a ticket — more tickets = better odds!</div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-primary" style="flex:1" onclick="buyRaffleTicket(${kidId},1)"
+          ${kid.points<1?'disabled style="opacity:.5"':''}>🎟️ 1 ticket — 1 ⭐</button>
+        <button class="btn btn-gold" style="flex:1" onclick="buyRaffleTicket(${kidId},2)"
+          ${kid.points<2?'disabled style="opacity:.5"':''}>✨ Golden — 2 ⭐<br><span style="font-size:.7rem">2× the odds!</span></button>
+      </div>
+    </div>`:'';
+
+  return`<h2 class="fredoka" style="margin-bottom:8px">🎟️ Weekly Raffle</h2>
+    <div style="font-size:.78rem;color:var(--muted);font-weight:700;margin-bottom:12px">${r.weekLabel||''}</div>
+    ${drawnHtml}
+    ${prizeHtml}
+    <div style="display:flex;gap:10px;margin-bottom:16px">
+      <div class="card" style="flex:1;text-align:center;padding:14px">
+        <div style="font-family:'Fredoka One',cursive;font-size:2rem;color:#f59e0b">${(r.tickets||[]).length}</div>
+        <div style="font-size:.75rem;font-weight:800;color:var(--muted)">Total Tickets</div>
+      </div>
+      <div class="card" style="flex:1;text-align:center;padding:14px">
+        <div style="font-family:'Fredoka One',cursive;font-size:2rem;color:#7c3aed">${allEntrants.length}</div>
+        <div style="font-size:.75rem;font-weight:800;color:var(--muted)">Entrants</div>
+      </div>
+      <div class="card" style="flex:1;text-align:center;padding:14px">
+        <div style="font-family:'Fredoka One',cursive;font-size:2rem;color:#10b981">${myTickets.length}</div>
+        <div style="font-size:.75rem;font-weight:800;color:var(--muted)">My Tickets</div>
+      </div>
+    </div>
+    ${myTickets.length?`<div class="section-head">🎟️ My Tickets</div>${ticketRows}`:''}
+    ${buyBtns}
+    ${(r.history||[]).length?`<div class="section-head" style="margin-top:20px">📜 Past Winners</div>${renderRaffleHistory()}`:''}`;
+}
+
+function renderRaffleHistory(){
+  return (state.raffle?.history||[]).slice(0,5).map(h=>`
+    <div class="card" style="margin-bottom:8px;display:flex;gap:10px;align-items:center">
+      <span style="font-size:1.6rem">${h.winner?.kidEmoji||'🏆'}</span>
+      <div style="flex:1">
+        <div style="font-weight:800">${h.winner?.kidName||'?'} won!</div>
+        <div style="font-size:.75rem;color:var(--muted);font-weight:700">${h.weekLabel} · ${h.prize}</div>
+      </div>
+    </div>`).join('');
+}
+
+function buyRaffleTicket(kidId,cost){
+  const kid=getKid(kidId);
+  if(!kid||kid.points<cost){notify('Not enough ⭐!','#ef4444');return;}
+  if(!state.raffle.active||state.raffle.drawn){notify('Raffle is not accepting tickets right now','#ef4444');return;}
+  kid.points=Math.max(0,kid.points-cost);
+  kid.pointLog.unshift({amount:-cost,reason:`🎟️ Raffle ticket (${cost===2?'Golden':'Standard'})`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+  logActivity(kidId,'🎟️',`Bought ${cost===2?'Golden':'Standard'} raffle ticket — ${cost} ⭐`);
+  if(!state.raffle.tickets) state.raffle.tickets=[];
+  state.raffle.tickets.push({kidId,kidName:kid.name,kidEmoji:kid.emoji,cost,ts:new Date().toISOString()});
+  notify(`🎟️ Ticket entered! Good luck ${kid.emoji}`,'#f59e0b');
+  saveState();renderTab(session.type,session.id);
+}
+
+// ── Parent view ───────────────────────────────────────────
+function renderRaffleParent(){
+  const r=state.raffle||{};
+  const totalTickets=(r.tickets||[]).length;
+  const totalPot=(r.tickets||[]).reduce((s,t)=>s+t.cost,0);
+
+  // Ticket breakdown by kid
+  const byKid={};
+  (r.tickets||[]).forEach(t=>{
+    if(!byKid[t.kidId]) byKid[t.kidId]={name:t.kidName,emoji:t.kidEmoji,count:0,cost:0};
+    byKid[t.kidId].count++;byKid[t.kidId].cost+=t.cost;
+  });
+  const kidRows=Object.values(byKid).map(k=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:1.6rem">${k.emoji}</span>
+      <span style="flex:1;font-weight:800">${k.name}</span>
+      <span style="font-weight:800;color:#7c3aed">${k.count} ticket${k.count!==1?'s':''}</span>
+      <span style="font-weight:800;color:#f59e0b;margin-left:6px">${k.cost} ⭐ spent</span>
+    </div>`).join('');
+
+  const setupHtml=`<div class="card" style="margin-bottom:16px">
+    <div class="section-head">⚙️ Raffle Setup</div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:.82rem;font-weight:800;color:var(--muted);display:block;margin-bottom:4px">Prize Description</label>
+      <input id="rafflePrizeInput" class="f-inp" placeholder="e.g. Movie night, $10 Amazon credit..." value="${r.prize||''}" style="width:100%">
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:.82rem;font-weight:800;color:var(--muted);display:block;margin-bottom:4px">Week Label</label>
+      <input id="raffleWeekInput" class="f-inp" placeholder="e.g. Week of Mar 10" value="${r.weekLabel||''}" style="width:100%">
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${!r.active?`<button class="btn btn-green" onclick="startRaffle()">▶️ Start Raffle</button>`
+        :`<button class="btn btn-red" onclick="stopRaffle()">⏹️ Close Raffle</button>`}
+      <button class="btn btn-outline" onclick="saveRaffleSetup()">💾 Save Prize / Label</button>
+      ${totalTickets>0&&!r.drawn?`<button class="btn btn-primary" onclick="openRaffleSpin()">🎡 Spin the Wheel!</button>`:''}
+      ${r.drawn?`<button class="btn btn-outline" onclick="openRaffleSpin()">🏆 View Result</button>`:''}
+      ${totalTickets>0||r.drawn?`<button class="btn btn-red" onclick="resetRaffle()">🗑️ Reset & New Week</button>`:''}
+    </div>
+  </div>`;
+
+  const statusBadge=r.active?'<span style="background:#10b981;color:white;padding:3px 10px;border-radius:12px;font-size:.78rem;font-weight:800">🟢 OPEN</span>'
+    :'<span style="background:#ef4444;color:white;padding:3px 10px;border-radius:12px;font-size:.78rem;font-weight:800">🔴 CLOSED</span>';
+
+  const potHtml=`<div style="display:flex;gap:10px;margin-bottom:16px">
+    <div class="card" style="flex:1;text-align:center;padding:14px">
+      <div style="font-family:'Fredoka One',cursive;font-size:2rem;color:#7c3aed">${totalTickets}</div>
+      <div style="font-size:.75rem;font-weight:800;color:var(--muted)">Tickets</div>
+    </div>
+    <div class="card" style="flex:1;text-align:center;padding:14px">
+      <div style="font-family:'Fredoka One',cursive;font-size:2rem;color:#f59e0b">${totalPot}</div>
+      <div style="font-size:.75rem;font-weight:800;color:var(--muted)">⭐ in Pot</div>
+    </div>
+    <div class="card" style="flex:1;text-align:center;padding:14px">
+      <div style="font-family:'Fredoka One',cursive;font-size:2rem;color:#10b981">${Object.keys(byKid).length}</div>
+      <div style="font-size:.75rem;font-weight:800;color:var(--muted)">Entrants</div>
+    </div>
+  </div>`;
+
+  const ticketPot=`<div class="card" style="margin-bottom:16px">
+    <div class="section-head">🎟️ Ticket Pot ${statusBadge}</div>
+    ${totalTickets?kidRows:'<div style="color:var(--muted);padding:12px;text-align:center;font-weight:700">No tickets yet</div>'}
+  </div>`;
+
+  const historyHtml=(r.history||[]).length?`<div class="card">
+    <div class="section-head">📜 Past Winners</div>
+    ${renderRaffleHistory()}
+  </div>`:'';
+
+  return`<h2 class="fredoka" style="margin-bottom:8px">🎟️ Weekly Raffle</h2>
+    <div style="font-size:.78rem;color:var(--muted);font-weight:700;margin-bottom:16px">Run a weekly prize draw for the kids</div>
+    ${setupHtml}${potHtml}${ticketPot}${historyHtml}`;
+}
+
+function startRaffle(){
+  saveRaffleSetup();
+  state.raffle.active=true;
+  state.raffle.drawn=false;
+  state.raffle.winner=null;
+  if(!state.raffle.weekLabel){
+    const d=new Date();
+    state.raffle.weekLabel=`Week of ${d.toLocaleDateString([],{month:'short',day:'numeric'})}`;
+  }
+  saveState();renderTab(session.type,session.id);
+  notify('🎟️ Raffle is open! Kids can buy tickets.','#10b981');
+}
+function stopRaffle(){
+  state.raffle.active=false;
+  saveState();renderTab(session.type,session.id);
+  notify('Raffle closed — no more tickets','#f59e0b');
+}
+function saveRaffleSetup(){
+  state.raffle.prize=document.getElementById('rafflePrizeInput')?.value?.trim()||state.raffle.prize||'';
+  state.raffle.weekLabel=document.getElementById('raffleWeekInput')?.value?.trim()||state.raffle.weekLabel||'';
+  saveState();
+}
+function resetRaffle(){
+  if(!confirm('Archive this week and start fresh? Tickets will be cleared.'))return;
+  // Archive to history if there was a winner
+  if(state.raffle.drawn&&state.raffle.winner){
+    if(!state.raffle.history) state.raffle.history=[];
+    state.raffle.history.unshift({weekLabel:state.raffle.weekLabel,prize:state.raffle.prize,winner:state.raffle.winner,ts:new Date().toISOString()});
+    if(state.raffle.history.length>20) state.raffle.history=state.raffle.history.slice(0,20);
+  }
+  state.raffle.active=false;state.raffle.tickets=[];state.raffle.winner=null;state.raffle.drawn=false;
+  state.raffle.prize='';state.raffle.weekLabel='';
+  saveState();renderTab(session.type,session.id);
+  notify('🎟️ Raffle reset — ready for a new week','#0ea5e9');
+}
+
+// ── Spin Wheel ────────────────────────────────────────────────
+let _raffleSpinning=false;
+
+function openRaffleSpin(){
+  const r=state.raffle;
+  const tickets=r.tickets||[];
+  if(!tickets.length){notify('No tickets in the pot yet!','#ef4444');return;}
+  document.getElementById('rafflePrizeLabel').textContent=r.prize?`🏆 Prize: ${r.prize}`:'';
+  document.getElementById('raffleWinnerBanner').style.display='none';
+
+  // Build spin button / result
+  const spinBtn=document.getElementById('raffleSpinBtn');
+  if(r.drawn&&r.winner){
+    spinBtn.innerHTML=`<div style="font-size:.85rem;color:var(--muted);font-weight:700">Draw already complete</div>`;
+    document.getElementById('raffleWinnerBanner').style.display='block';
+    document.getElementById('raffleWinnerBanner').innerHTML=`🎉 ${r.winner.kidEmoji} ${r.winner.kidName} wins!`;
+  } else {
+    spinBtn.innerHTML=`<button class="btn btn-primary" style="width:100%;font-size:1.1rem;padding:14px" onclick="spinRaffleWheel()">🎡 Spin!</button>`;
+  }
+
+  drawRaffleWheel(0);
+  openModal('raffleSpinModal');
+}
+
+function drawRaffleWheel(angle){
+  const canvas=document.getElementById('raffleWheel');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height,cx=W/2,cy=H/2,rad=cx-10;
+  // Build unique entrants (weighted by ticket count)
+  const tickets=state.raffle.tickets||[];
+  // Get unique kids
+  const kids=[...new Map(tickets.map(t=>[t.kidId,t])).values()];
+  const n=kids.length;
+  if(!n)return;
+  const sliceAngle=(Math.PI*2)/n;
+  const colors=['#ff3d6e','#ff7a00','#f59e0b','#10b981','#0ea5e9','#7c3aed','#ec4899','#14b8a6'];
+
+  ctx.clearRect(0,0,W,H);
+
+  // Outer glow ring
+  ctx.save();
+  ctx.beginPath();ctx.arc(cx,cy,rad+8,0,Math.PI*2);
+  ctx.strokeStyle='rgba(255,122,0,0.3)';ctx.lineWidth=8;ctx.stroke();
+  ctx.restore();
+
+  kids.forEach((kid,i)=>{
+    const start=angle+i*sliceAngle;
+    const end=start+sliceAngle;
+    // Slice
+    ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,rad,start,end);ctx.closePath();
+    ctx.fillStyle=colors[i%colors.length];
+    ctx.shadowColor=colors[i%colors.length];ctx.shadowBlur=6;
+    ctx.fill();
+    ctx.strokeStyle='white';ctx.lineWidth=2;ctx.stroke();
+    ctx.shadowBlur=0;
+    // Text
+    ctx.save();
+    ctx.translate(cx,cy);ctx.rotate(start+sliceAngle/2);
+    ctx.textAlign='right';ctx.font='bold 15px Arial';ctx.fillStyle='white';
+    ctx.shadowColor='rgba(0,0,0,.6)';ctx.shadowBlur=3;
+    ctx.fillText(kid.kidEmoji+' '+kid.kidName,rad-14,5);
+    ctx.restore();
+  });
+
+  // Centre cap
+  ctx.beginPath();ctx.arc(cx,cy,24,0,Math.PI*2);
+  const cg=ctx.createRadialGradient(cx,cy,0,cx,cy,24);
+  cg.addColorStop(0,'#fff');cg.addColorStop(1,'#f0f0f0');
+  ctx.fillStyle=cg;ctx.shadowColor='rgba(0,0,0,.3)';ctx.shadowBlur=8;ctx.fill();
+  ctx.shadowBlur=0;
+  ctx.beginPath();ctx.arc(cx,cy,24,0,Math.PI*2);ctx.strokeStyle='#ddd';ctx.lineWidth=2;ctx.stroke();
+
+  // Pointer triangle at top
+  ctx.beginPath();ctx.moveTo(cx,12);ctx.lineTo(cx-14,36);ctx.lineTo(cx+14,36);ctx.closePath();
+  ctx.fillStyle='#ff3d6e';ctx.shadowColor='#ff3d6e';ctx.shadowBlur=10;ctx.fill();
+  ctx.shadowBlur=0;
+}
+
+function spinRaffleWheel(){
+  if(_raffleSpinning)return;
+  const tickets=state.raffle.tickets||[];
+  if(!tickets.length)return;
+
+  // Pick winner — weighted by ticket cost (golden ticket = 2 entries)
+  const pool=[];
+  tickets.forEach(t=>{
+    for(let i=0;i<t.cost;i++) pool.push(t);
+  });
+  const winTicket=pool[Math.floor(Math.random()*pool.length)];
+
+  // Find winner's slice index
+  const kids=[...new Map(tickets.map(t=>[t.kidId,t])).values()];
+  const n=kids.length;
+  const winIdx=kids.findIndex(k=>k.kidId===winTicket.kidId);
+  const sliceAngle=(Math.PI*2)/n;
+
+  // Animate spin — land pointer (top = -π/2) on winner's slice
+  _raffleSpinning=true;
+  document.getElementById('raffleSpinBtn').innerHTML=`<div style="font-size:.9rem;font-weight:800;color:var(--muted)">🎡 Spinning...</div>`;
+
+  const totalRotation=Math.PI*2*6 + (Math.PI*2 - (winIdx*sliceAngle + sliceAngle/2));
+  const duration=4500;
+  const start=performance.now();
+  let currentAngle=0;
+
+  function frame(now){
+    const elapsed=Math.min(now-start,duration);
+    const t=elapsed/duration;
+    // Ease out cubic
+    const eased=1-Math.pow(1-t,3);
+    currentAngle=eased*totalRotation;
+    drawRaffleWheel(-Math.PI/2+currentAngle);
+    if(elapsed<duration){
+      requestAnimationFrame(frame);
+    } else {
+      // Done
+      _raffleSpinning=false;
+      state.raffle.winner={kidId:winTicket.kidId,kidName:winTicket.kidName,kidEmoji:winTicket.kidEmoji,ts:new Date().toISOString()};
+      state.raffle.drawn=true;
+      state.raffle.active=false;
+      saveState();
+      // Show winner banner
+      const banner=document.getElementById('raffleWinnerBanner');
+      banner.textContent=`🎉 ${winTicket.kidEmoji} ${winTicket.kidName} wins!`;
+      banner.style.display='block';
+      document.getElementById('raffleSpinBtn').innerHTML=`<div style="font-size:.85rem;color:var(--muted);font-weight:700">Draw complete!</div>`;
+      confetti();
+      notify(`🎉 ${winTicket.kidEmoji} ${winTicket.kidName} wins the raffle!`,'#10b981');
+      // Re-render tab in background so parent view updates
+      setTimeout(()=>renderTab(session.type,session.id),500);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
 // ═══ ACTIVITY LOG ═══
 function openActivityLog(kidId){
   const sel=document.getElementById('actLogKidSel');
@@ -4218,7 +4583,10 @@ function hydrateState(saved){
   if(!saved.todos)           saved.todos={};
   if(!saved.dayBoard)        saved.dayBoard=[];
   if(!saved._gameRewards)    saved._gameRewards={};
-  if(!saved.lastResetDate)   saved.lastResetDate=todayKey(); // default to today on first load
+  if(!saved.lastResetDate)   saved.lastResetDate=todayKey();
+  if(!saved.raffle) saved.raffle={active:false,prize:'',weekLabel:'',tickets:[],winner:null,drawn:false,history:[]};
+  if(!saved.raffle.history) saved.raffle.history=[];
+  if(saved.raffle.tickets) saved.raffle.tickets=Array.isArray(saved.raffle.tickets)?saved.raffle.tickets:Object.values(saved.raffle.tickets||{});
   // Prune old reward keys (keep only today's)
   const _today=new Date().toISOString().slice(0,10);
   Object.keys(saved._gameRewards).forEach(k=>{if(!k.endsWith(_today))delete saved._gameRewards[k];});
