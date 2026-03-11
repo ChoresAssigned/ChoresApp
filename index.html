@@ -4023,7 +4023,8 @@ function midnightReset(){
   state.rewardRequests=(state.rewardRequests||[]).filter(r=>r.status==='pending');
   const threeDaysAgo=Date.now()-(3*24*60*60*1000);
   state.dayBoard=(state.dayBoard||[]).filter(item=>item.pinned||new Date(item.id.replace('db_','')).getTime()>threeDaysAgo);
-  saveState(true); // immediate push — other devices pick up the reset via onValue within ~1s
+  saveLocalFallback(); // update localStorage immediately so this device sees reset now
+  saveState(true);     // push to Firebase — all other devices update via onValue within ~1s
   notify('🌅 New day! Chores reset.','#0ea5e9');
   if(session.type)renderTab(session.type,session.id);
   renderHome();
@@ -4642,7 +4643,10 @@ function loadLocalFallback(){
   try{
     const raw = localStorage.getItem(SAVE_KEY);
     if(!raw) return false;
-    Object.assign(state, hydrateState(JSON.parse(raw)));
+    const hydrated = hydrateState(JSON.parse(raw));
+    // Full replace — same as onValue handler
+    Object.keys(state).forEach(k=>{ if(!(k in hydrated)) delete state[k]; });
+    Object.assign(state, hydrated);
     return true;
   }catch(e){ return false; }
 }
@@ -4655,9 +4659,15 @@ async function startLiveSync(){
     _unsubscribe = onValue(ref(db,'appState'), snap=>{
       const data = snap.val();
       if(!data) return;
-      // Merge incoming Firebase state — always apply so resets propagate instantly
-      Object.assign(state, hydrateState(data));
-      // Re-render everything
+      // FULL replace — not a shallow merge. Shallow merge leaves stale keys in place.
+      const hydrated = hydrateState(data);
+      Object.keys(state).forEach(k=>{ if(!(k in hydrated)) delete state[k]; });
+      Object.assign(state, hydrated);
+      // Keep localStorage in sync with what Firebase says (prevents stale local data)
+      saveLocalFallback();
+      // Check missed midnight reset AFTER full state is loaded
+      checkMissedReset();
+      // Re-render
       if(session.type) renderTab(session.type, session.id);
       renderHome();
       if(session.type){
@@ -4701,7 +4711,9 @@ async function initFirebase(cfg){
 // ── Fetch config from Cloudflare Worker, then init ──
 async function tryAutoConnect(){
   setDotState('connecting');
-  loadLocalFallback(); // show local data immediately while fetching
+  // Load local data first so screen isn't blank while Firebase connects
+  const hadLocal = loadLocalFallback();
+  if(hadLocal) checkMissedReset(); // catch overnight resets even before Firebase
 
   if(!WORKER_URL || WORKER_URL === 'PASTE_YOUR_WORKER_URL_HERE'){
     console.warn('Worker URL not set — running local-only');
@@ -4715,10 +4727,11 @@ async function tryAutoConnect(){
     const cfg  = await res.json();
     if(!cfg.apiKey || !cfg.databaseURL) throw new Error('Config missing required fields');
     await initFirebase(cfg);
+    // Firebase onValue will fire and do a full state replace — localStorage gets updated then
   }catch(e){
     console.warn('Could not fetch config from Worker:', e.message);
     setDotState('error');
-    // Still usable offline with local data
+    // Running offline — local data is all we have
   }
 }
 
