@@ -2304,7 +2304,7 @@ function renderSettings(){
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-orange btn-sm" onclick="openHistoryModal()">📅 View History</button>
         <button class="btn btn-red btn-sm" onclick="fullDatabaseWipe()">💣 Wipe All Data</button>
-        <button class="btn btn-outline btn-sm" onclick="if(confirm('Reset today\\'s chores for all kids?')){archiveToday();state.choreState={};state.kids.forEach(k=>{k.loggedInAt=null;k.approvedAt=null;k.homeTime=null;k.tidyChecked=false;k.tidySigned=false;});saveState();renderTab(session.type,session.id);notify('↩️ Chores reset for today');}">↩️ Reset Today's Chores</button>
+        <button class="btn btn-outline btn-sm" onclick="manualResetChores()">↩️ Reset Today's Chores</button>
       </div>
     </div>
   </div>`;
@@ -4006,13 +4006,13 @@ function archiveToday(){
 function midnightReset(){
   archiveToday();
   state.choreState={};
-  state.lastResetDate=todayKey(); // stamp so other devices know reset happened
+  state.lastResetDate=todayKey();
+  state._resetTs=Date.now(); // unique stamp — other devices detect change even if date matches
   state.kids.forEach(k=>{
     k.loggedInAt=null;k.approvedAt=null;k.homeTime=null;
     k.morningStartTime=null;k.dinnerStartTime=null;
     delete k._bonus_morning;delete k._bonus_afterschool;delete k._bonus_afterdinner;
     k.tidyChecked=false;k.tidySigned=false;
-    // Archive today's activityLog to history, then reset
     if(!state.history) state.history={};
     const _yk=todayKey();
     if(!state.history[_yk]) state.history[_yk]={};
@@ -4023,18 +4023,22 @@ function midnightReset(){
   state.rewardRequests=(state.rewardRequests||[]).filter(r=>r.status==='pending');
   const threeDaysAgo=Date.now()-(3*24*60*60*1000);
   state.dayBoard=(state.dayBoard||[]).filter(item=>item.pinned||new Date(item.id.replace('db_','')).getTime()>threeDaysAgo);
-  saveState();
+  saveState(true); // immediate push — other devices pick up the reset via onValue within ~1s
   notify('🌅 New day! Chores reset.','#0ea5e9');
   if(session.type)renderTab(session.type,session.id);
   renderHome();
 }
 function checkMissedReset(){
-  // Called on app open/resume — catches devices that were offline/closed at midnight
   const today=todayKey();
   if(state.lastResetDate!==today){
-    console.log('Missed midnight reset detected — running now');
-    midnightReset();
+    console.log('[ChoreChampions] Missed midnight reset — running now for',today);
+    midnightReset(); // midnightReset calls saveState() which pushes to Firebase
   }
+}
+function manualResetChores(){
+  if(!confirm('Reset today\'s chores for ALL kids? This pushes to all devices.'))return;
+  midnightReset();
+  notify('↩️ Chores reset — all devices will update shortly','#0ea5e9');
 }
 function scheduleMidnightReset(){
   const now=new Date(),midnight=new Date(now);
@@ -4601,15 +4605,17 @@ function hydrateState(saved){
 }
 
 // ── Push state to Firebase (debounced 800ms) ──
-function saveState(){
+function saveState(immediate=false){
   if(!db){ saveLocalFallback(); return; }
   clearTimeout(_syncTimeout);
+  const delay=immediate?0:800;
   _syncTimeout = setTimeout(async ()=>{
     try{
       const {ref, set} = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js');
       await set(ref(db,'appState'), serialiseState());
+      saveLocalFallback(); // keep local in sync too
     }catch(e){ console.warn('Firebase save failed',e); saveLocalFallback(); }
-  }, 800);
+  }, delay);
 }
 
 // ── Local fallback (offline / before Worker responds) ──
@@ -4634,17 +4640,9 @@ async function startLiveSync(){
     _unsubscribe = onValue(ref(db,'appState'), snap=>{
       const data = snap.val();
       if(!data) return;
-      // Don't overwrite state while a profile/settings modal is open — would wipe unsaved edits
-      // BUT always apply chore/game updates even with modal open
-      const profileModalOpen=[...document.querySelectorAll('.modal-overlay')].some(m=>{
-        if(!(m.style.display==='flex'||m.classList.contains('open')))return false;
-        // Only block for modals that have editable inputs (profile edit, settings)
-        return m.querySelector('input,select,textarea')!==null;
-      });
-      if(profileModalOpen) return;
+      // Merge incoming Firebase state — always apply so resets propagate instantly
       Object.assign(state, hydrateState(data));
-      // Check if we missed a midnight reset (device was offline/asleep)
-      checkMissedReset();
+      // Re-render everything
       if(session.type) renderTab(session.type, session.id);
       renderHome();
       if(session.type){
