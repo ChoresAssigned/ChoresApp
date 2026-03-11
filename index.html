@@ -1074,8 +1074,33 @@ function renderKidPoints(kid){
 }
 
 // ═══ ARCADE MENU ═══
+function arcadeUnlocked(kidId){
+  // Arcade unlocks when all after-school chores are signed (or cancelled), or if there are none
+  const kid=getKid(kidId);
+  const asChores=kidChores(kidId).filter(c=>(c.category||'afterschool')==='afterschool');
+  if(!asChores.length) return true; // no afterschool chores assigned — always open
+  return asChores.every(c=>{ const s=getCS(kidId,c.id); return s.signed||s.cancelled; });
+}
+
 function renderArcadeMenu(kidId){
   const kid=getKid(kidId);
+  const unlocked=arcadeUnlocked(kidId);
+
+  if(!unlocked){
+    const asChores=kidChores(kidId).filter(c=>(c.category||'afterschool')==='afterschool');
+    const signed=asChores.filter(c=>{ const s=getCS(kidId,c.id); return s.signed||s.cancelled; }).length;
+    const total=asChores.length;
+    return`<h2 class="fredoka" style="margin-bottom:4px">🎮 Arcade</h2>
+      <div class="card" style="text-align:center;padding:32px 20px;border:2px dashed var(--border)">
+        <div style="font-size:3.5rem;margin-bottom:12px">🔒</div>
+        <div style="font-family:'Fredoka One',cursive;font-size:1.4rem;margin-bottom:8px">Arcade is Locked</div>
+        <div style="font-size:.9rem;color:var(--muted);font-weight:700;margin-bottom:16px">Finish your after-school chores first!<br>Get them all signed off to unlock the games.</div>
+        <div style="background:var(--surface2);border-radius:12px;padding:12px 20px;display:inline-block;font-weight:800">
+          ✅ ${signed} / ${total} after-school chores signed
+        </div>
+      </div>`;
+  }
+
   const cards=GAME_DEFS.map(g=>{
     const diff=getDiff(g.id);
     const diffCls=diff==='easy'?'diff-easy':diff==='hard'?'diff-hard':'diff-medium';
@@ -1091,7 +1116,7 @@ function renderArcadeMenu(kidId){
     </div>`;}).join('');
   return`<h2 class="fredoka" style="margin-bottom:4px">🎮 Arcade</h2>
     <p style="color:var(--muted);font-size:.82rem;font-weight:700;margin-bottom:14px">Spend 1 ⭐ to play · Beat the game = earn ⭐ back · ${kid.emoji} ${kid.name} has <strong>${kid.points} ⭐</strong></p>
-    ${kid.points<1?'<div class="card" style="background:#fee2e2;border-color:#fecaca;color:#991b1b;font-weight:800;text-align:center;padding:16px">Not enough points to play! Earn more by doing chores! 💪</div>':''}
+    ${kid.points<1?'<div class="card" style="background:#fee2e2;border-color:#fecaca;color:#991b1b;font-weight:800;text-align:center;padding:16px;margin-bottom:12px">Not enough points to play! Earn more by doing chores! 💪</div>':''}
     <div class="arcade-menu">${cards}</div>`;
 }
 
@@ -1132,6 +1157,7 @@ function updateLeaderboard(gameId,kidId,score){
 // ═══ GAME LAUNCH ═══
 function launchGame(gameId,kidId){
   const kid=getKid(kidId);
+  if(!arcadeUnlocked(kidId)){notify('🔒 Finish your after-school chores first!','#ef4444');return;}
   if(kid.points<1){notify('Not enough points!','#ef4444');return;}
   kid.points=Math.max(0,kid.points-1);
   kid.pointLog.unshift({amount:-1,reason:`🎮 Played ${GAME_DEFS.find(g=>g.id===gameId).name}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
@@ -3996,7 +4022,7 @@ function archiveToday(){
     state.history[key][kid.id]={kidName:kid.name,points:kid.points,chores:{}};
     chores.forEach(c=>{
       const cs=getCS(kid.id,c.id);
-      state.history[key][kid.id].chores[c.name]=cs.signed?'signed':cs.checked?'checked':cs.cancelled?'cancelled':'missed';
+      state.history[key][kid.id].chores[fbKey(c.name)]=cs.signed?'signed':cs.checked?'checked':cs.cancelled?'cancelled':'missed';
     });
   });
 }
@@ -4536,8 +4562,24 @@ let _syncTimeout = null;
 let _unsubscribe = null;
 
 // ── Serialise state (Dates → ISO strings) ──
+// Sanitize a string for use as a Firebase key — strip . $ # [ ] / and leading/trailing spaces
+function fbKey(s){ return String(s).replace(/[.$#\[\]/]/g,'_').trim()||'_'; }
+
 function serialiseState(){
   const raw = JSON.parse(JSON.stringify(state, (_k,v) => v instanceof Date ? v.toISOString() : v));
+  // Sanitize any history chore keys that may contain invalid Firebase characters
+  if(raw.history){
+    Object.keys(raw.history).forEach(date=>{
+      Object.keys(raw.history[date]).forEach(kidId=>{
+        const chores=raw.history[date][kidId]?.chores;
+        if(chores){
+          const cleaned={};
+          Object.keys(chores).forEach(k=>{ cleaned[fbKey(k)]=chores[k]; });
+          raw.history[date][kidId].chores=cleaned;
+        }
+      });
+    });
+  }
   // Firebase drops null and {} — use sentinels so other devices see the reset
   const dateSentinels=['loggedInAt','approvedAt','homeTime','morningStartTime','dinnerStartTime'];
   if(raw.kids) raw.kids.forEach(k=>{
