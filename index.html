@@ -610,7 +610,7 @@ const IS_MOBILE = /Mobi|Android|iPhone|iPad|iPod|Touch/i.test(navigator.userAgen
 // STATE
 // ═══════════════════════════════════════════════════════
 const DAYS_SHORT=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-const TODAY_NAME=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()];
+const TODAY_NAME=(['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].find(d=>njDateParts().weekday.startsWith(d))||'Mon');
 const KC=['#ff3d6e','#00b896','#ff7a00','#7c3aed'];
 const KB=['rgba(255,61,110,.08)','rgba(0,184,150,.08)','rgba(255,122,0,.08)','rgba(124,58,237,.08)'];
 const KBD=['#ffc5d2','#a7f3e0','#ffd8b0','#ddd6fe'];
@@ -705,7 +705,7 @@ function formatTime12(t){
 function tick(){
   const now=new Date();
   const el=document.getElementById('homeDatetime');
-  if(el)el.textContent=now.toLocaleString([],{weekday:'long',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  if(el)el.textContent=now.toLocaleString('en-US',{timeZone:TZ,weekday:'long',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
 }
 setInterval(tick,1000);tick();
 
@@ -962,7 +962,7 @@ function renderKidChores(kid){
     else              timerHtml=`<span class="timer-chip timer-out">⏱ ${mins}m</span>`;
   }
   const approvalHtml=kid.approvedAt
-    ?`<div class="free-time-banner approved">🎉<div><strong>FREE TIME!</strong><br><span style="font-size:.8rem;font-weight:600">Approved ${kid.approvedAt.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span></div></div>`
+    ?`<div class="free-time-banner approved">🎉<div><strong>FREE TIME!</strong><br><span style="font-size:.8rem;font-weight:600">Approved ${kid.approvedAt.toLocaleTimeString('en-US',{timeZone:TZ,hour:'2-digit',minute:'2-digit'})}</span></div></div>`
     :kid.homeTime?`<div class="free-time-banner waiting">⏳<div>${signed}/${allChores.length} signed ${timerHtml}</div></div>`:'';
 
   // "I'm Home" card — only shown if there are after-school chores
@@ -974,7 +974,7 @@ function renderKidChores(kid){
           <div style="font-size:.8rem;color:var(--muted);font-weight:700;margin-bottom:12px">Starts your bonus points timer for after-school chores</div>
           <button class="btn btn-green" onclick="loginKid(${i})">I'm Home! 🏠</button>
         </div>`
-      :`<div style="font-size:.8rem;color:var(--muted);margin-bottom:10px;font-weight:700">🏠 Home since <strong>${kid.homeTime.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</strong></div>`)
+      :`<div style="font-size:.8rem;color:var(--muted);margin-bottom:10px;font-weight:700">🏠 Home since <strong>${kid.homeTime.toLocaleTimeString('en-US',{timeZone:TZ,hour:'2-digit',minute:'2-digit'})}</strong></div>`)
     :'';
 
   // Render a chore row — locked = not clickable
@@ -990,7 +990,7 @@ function renderKidChores(kid){
       :'<span class="badge badge-pending">To Do</span>';
     return`<div class="chore-row ${rc}">
       <div class="chore-check-box ${bx}" onclick="${disabled?'':`toggleChore(${i},${c.id})`}" style="${disabled?'cursor:default':''}">${cs.signed||cs.checked?'✓':''}</div>
-      <div class="chore-info"><div class="chore-name">${c.name} ${dl}</div>${cs.checkedAt?`<div class="chore-meta">${cs.checkedAt.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>`:''}</div>
+      <div class="chore-info"><div class="chore-name">${c.name} ${dl}</div>${cs.checkedAt?`<div class="chore-meta">${cs.checkedAt.toLocaleTimeString('en-US',{timeZone:TZ,hour:'2-digit',minute:'2-digit'})}</div>`:''}</div>
       ${bg}
     </div>`;
   }
@@ -1015,7 +1015,7 @@ function renderKidChores(kid){
 
   const morningSection=morning.length?`
     <div class="section-head">🌅 Morning Chores
-      <span style="font-size:.7rem;font-weight:700;margin-left:8px;opacity:.7">4am–10am</span>
+      <span style="font-size:.7rem;font-weight:700;margin-left:8px;opacity:.7">4am–12pm</span>
       ${catTimerChip('morning')}
     </div>
     ${!mWin.open?`<div style="font-size:.8rem;background:var(--surface2);border:2px dashed var(--border);border-radius:10px;padding:10px;text-align:center;color:var(--muted);font-weight:700;margin-bottom:8px">🔒 ${mWin.reason}</div>`:''}
@@ -1024,7 +1024,7 @@ function renderKidChores(kid){
 
   const afterSchoolSection=afterSchool.length?`
     <div class="section-head">🏠 After School Chores
-      <span style="font-size:.7rem;font-weight:700;margin-left:8px;opacity:.7">11am–6pm</span>
+      <span style="font-size:.7rem;font-weight:700;margin-left:8px;opacity:.7">11am–8pm</span>
       ${catTimerChip('afterschool')}
     </div>
     ${!asWin.open?`<div style="font-size:.8rem;background:var(--surface2);border:2px dashed var(--border);border-radius:10px;padding:10px;text-align:center;color:var(--muted);font-weight:700;margin-bottom:8px">🔒 ${asWin.reason}</div>`:''}
@@ -1034,7 +1034,7 @@ function renderKidChores(kid){
 
   const afterDinnerSection=afterDinner.length?`
     <div class="section-head">🌙 Dinner Chores
-      <span style="font-size:.7rem;font-weight:700;margin-left:8px;opacity:.7">6pm–9pm</span>
+      <span style="font-size:.7rem;font-weight:700;margin-left:8px;opacity:.7">5pm–11pm</span>
       ${catTimerChip('afterdinner')}
     </div>
     ${!adWin.open?`<div style="font-size:.8rem;background:var(--surface2);border:2px dashed var(--border);border-radius:10px;padding:10px;text-align:center;color:var(--muted);font-weight:700;margin-bottom:8px">🔒 ${adWin.reason}</div>`:''}
@@ -1114,8 +1114,19 @@ function renderArcadeMenu(kidId){
       ${eduBadge}
       <div class="agc-diff ${diffCls}" style="margin-top:4px">${diffLabel}</div>
     </div>`;}).join('');
+  const earned=arcadeEarnedToday(kidId);
+  const capHit=earned>=ARCADE_DAILY_CAP;
+  const capBar=`<div style="background:var(--surface2);border-radius:12px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px">
+    <span style="font-size:1rem">🎮</span>
+    <div style="flex:1">
+      <div style="font-size:.75rem;font-weight:800;color:var(--muted);margin-bottom:4px">Daily arcade earnings: ${earned}/${ARCADE_DAILY_CAP} ⭐</div>
+      <div style="background:var(--border);border-radius:99px;height:6px"><div style="background:${capHit?'#10b981':'#f59e0b'};width:${Math.min(100,earned/ARCADE_DAILY_CAP*100)}%;height:6px;border-radius:99px;transition:.3s"></div></div>
+    </div>
+    ${capHit?'<span style="font-size:.8rem;font-weight:800;color:#10b981">✅ Cap reached!</span>':''}
+  </div>`;
   return`<h2 class="fredoka" style="margin-bottom:4px">🎮 Arcade</h2>
-    <p style="color:var(--muted);font-size:.82rem;font-weight:700;margin-bottom:14px">Spend 1 ⭐ to play · Beat the game = earn ⭐ back · ${kid.emoji} ${kid.name} has <strong>${kid.points} ⭐</strong></p>
+    <p style="color:var(--muted);font-size:.82rem;font-weight:700;margin-bottom:8px">Spend 1 ⭐ to play · Beat the game = earn ⭐ back · ${kid.emoji} ${kid.name} has <strong>${kid.points} ⭐</strong></p>
+    ${capBar}
     ${kid.points<1?'<div class="card" style="background:#fee2e2;border-color:#fecaca;color:#991b1b;font-weight:800;text-align:center;padding:16px;margin-bottom:12px">Not enough points to play! Earn more by doing chores! 💪</div>':''}
     <div class="arcade-menu">${cards}</div>`;
 }
@@ -1160,7 +1171,7 @@ function launchGame(gameId,kidId){
   if(!arcadeUnlocked(kidId)){notify('🔒 Finish your after-school chores first!','#ef4444');return;}
   if(kid.points<1){notify('Not enough points!','#ef4444');return;}
   kid.points=Math.max(0,kid.points-1);
-  kid.pointLog.unshift({amount:-1,reason:`🎮 Played ${GAME_DEFS.find(g=>g.id===gameId).name}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+  kid.pointLog.unshift({amount:-1,reason:`🎮 Played ${GAME_DEFS.find(g=>g.id===gameId).name}`,time:new Date().toLocaleTimeString('en-US',{timeZone:TZ,hour:'2-digit',minute:'2-digit'})});
   currentGameId=gameId;currentGameKidId=kidId;
   buildArcadeScreen(gameId,kidId);
   showScreen('arcadeScreen');
@@ -1279,25 +1290,40 @@ function setScoreBar(items){
   bar.innerHTML=items.map(item=>`<div class="gsb-box"><div class="gsb-label">${item.label}</div><div class="gsb-val" style="color:${item.color||'var(--text)'}">${item.val}</div></div>`).join('');
 }
 
+// ── Arcade daily earnings cap ──
+const ARCADE_DAILY_CAP = 2;
+function arcadeEarnedToday(kidId){
+  // Sum all game reward points earned today by this kid
+  const today=todayKey();
+  const prefix=`gameReward_${kidId}_`;
+  let total=0;
+  Object.keys(state._gameRewards||{}).forEach(k=>{
+    if(k.startsWith(prefix)&&k.endsWith('_'+today)){
+      // value is true=already counted, or a number if we stored pts
+      const v=state._gameRewards[k];
+      total+=(typeof v==='number'?v:1);
+    }
+  });
+  return total;
+}
+
 // Called when score hits the win threshold — give reward but keep game running
 function onGameWin(score){
   const isStaff=String(currentGameKidId).startsWith('staff_');
-  // Mark reward as given on the active gameState so we don't double-reward
-  // Check persistent daily reward flag (survives page reload)
-  const today=new Date().toISOString().slice(0,10);
+  const today=todayKey();
   const rewardKey=`gameReward_${currentGameKidId}_${currentGameId}_${today}`;
   if(!state._gameRewards)state._gameRewards={};
-  if(state._gameRewards[rewardKey])return; // already rewarded today
-  state._gameRewards[rewardKey]=true;
-  // Also set in-memory flag
+  if(state._gameRewards[rewardKey])return; // already rewarded for this game today
+
+  // Also set in-memory flag immediately
   const gs=gameState[currentGameId]||gameState;
   if(gs)gs._rewarded=true;
 
   if(isStaff){
+    state._gameRewards[rewardKey]=0; // staff win tracked but no pts
     updateStaffLeaderboard(currentGameId,currentGameKidId,score);
     confetti();
     notify(`🎉 Win threshold hit! Keep going for a higher score!`,'#10b981');
-    // For edu games show a banner but continue
     if(EDU_GAMES.includes(currentGameId)){
       const badge=document.getElementById('arcadePtsBadge');
       if(badge)badge.innerHTML+=` <span style="color:#f59e0b;font-weight:800">🏆</span>`;
@@ -1305,22 +1331,40 @@ function onGameWin(score){
     saveState();return;
   }
 
-  // Kid — give points reward once
+  // Kid — check daily cap before giving points
   const kid=getKid(currentGameKidId);
   const g=GAME_DEFS.find(x=>x.id===currentGameId);
-  const reward=g.edu?3:2;
-  kid.points+=reward;
-  kid.pointLog.unshift({amount:reward,reason:`${g.edu?'🧠':'🎮'} Won ${g.name}! Score: ${score}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+  const wantReward=g.edu?3:2;
+  const alreadyEarned=arcadeEarnedToday(currentGameKidId);
+  const remaining=Math.max(0, ARCADE_DAILY_CAP - alreadyEarned);
+  const reward=Math.min(wantReward, remaining); // may be 0 if cap hit
+
+  // Always mark game as rewarded so per-game dedupe still works
+  state._gameRewards[rewardKey]=reward; // store actual pts given
+
   const badge=document.getElementById('arcadePtsBadge');
-  if(badge)badge.textContent=`${kid.emoji} ${kid.name} · ${kid.points} ⭐ 🏆`;
-  confetti();saveState();
-  notify(`🏆 +${reward} ⭐ earned! Keep going for a high score!`,'#10b981');
-  // Edu games: show a brief flash banner inside the game, then continue
+  if(reward>0){
+    kid.points+=reward;
+    kid.pointLog.unshift({amount:reward,reason:`${g.edu?'🧠':'🎮'} Won ${g.name}! Score: ${score}`,time:new Date().toLocaleTimeString('en-US',{timeZone:TZ,hour:'2-digit',minute:'2-digit'})});
+    if(badge)badge.textContent=`${kid.emoji} ${kid.name} · ${kid.points} ⭐ 🏆`;
+    confetti();saveState();
+    const newTotal=arcadeEarnedToday(currentGameKidId);
+    if(newTotal>=ARCADE_DAILY_CAP){
+      notify(`🏆 +${reward} ⭐! Daily arcade cap reached — great playing!`,'#10b981');
+    } else {
+      notify(`🏆 +${reward} ⭐ earned! (${newTotal}/${ARCADE_DAILY_CAP} today) Keep going!`,'#10b981');
+    }
+  } else {
+    // Cap already hit — win is recognised but no points
+    if(badge)badge.textContent=`${kid.emoji} ${kid.name} · ${kid.points} ⭐ 🏆`;
+    confetti();saveState();
+    notify(`🏆 Win! But daily arcade cap of ${ARCADE_DAILY_CAP} ⭐ already reached — nice try!`,'#f59e0b');
+  }
+  // Edu games: flash banner
   if(EDU_GAMES.includes(currentGameId)){
-    const el=document.getElementById('eduGame');
     const banner=document.createElement('div');
     banner.style.cssText='position:fixed;top:80px;left:50%;transform:translateX(-50%);background:#10b981;color:white;font-family:Fredoka One,cursive;font-size:1.2rem;padding:12px 28px;border-radius:20px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.3);pointer-events:none';
-    banner.textContent=`🏆 +${reward} ⭐ Won! Keep going!`;
+    banner.textContent=reward>0?`🏆 +${reward} ⭐ Won! Keep going!`:`🏆 Win! Cap reached for today`;
     document.body.appendChild(banner);
     setTimeout(()=>banner.remove(),2000);
   }
@@ -1369,9 +1413,9 @@ function onGameEnd(score){
     const kid2=getKid(currentGameKidId);
     if(!kid2||kid2.points<1){showOverlay('😢','No Points','Earn more by doing chores!','Go Back',exitGame);return;}
     kid2.points=Math.max(0,kid2.points-1);
-    kid2.pointLog.unshift({amount:-1,reason:`🎮 Played ${g.name}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+    kid2.pointLog.unshift({amount:-1,reason:`🎮 Played ${g.name}`,time:new Date().toLocaleTimeString('en-US',{timeZone:TZ,hour:'2-digit',minute:'2-digit'})});
     document.getElementById('arcadePtsBadge').textContent=`${kid2.emoji} ${kid2.name} · ${kid2.points} ⭐`;
-    const today2=new Date().toISOString().slice(0,10);
+    const today2=todayKey();
     const rk=`gameReward_${currentGameKidId}_${currentGameId}_${today2}`;
     const won=!!(state._gameRewards||{})[rk];
     initGame(currentGameId);startCurrentGame();
@@ -1390,10 +1434,10 @@ function eduPlayAgain(){
     return;
   }
   kid.points=Math.max(0,kid.points-1);
-  kid.pointLog.unshift({amount:-1,reason:`🧠 Played ${g.name}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+  kid.pointLog.unshift({amount:-1,reason:`🧠 Played ${g.name}`,time:new Date().toLocaleTimeString('en-US',{timeZone:TZ,hour:'2-digit',minute:'2-digit'})});
   document.getElementById('arcadePtsBadge').textContent=`${kid.emoji} ${kid.name} · ${kid.points} ⭐`;
   // Preserve _rewarded across play-agains within the same day
-  const today=new Date().toISOString().slice(0,10);
+  const today=todayKey();
   const rewardKey=`gameReward_${currentGameKidId}_${currentGameId}_${today}`;
   if(!state._gameRewards)state._gameRewards={};
   const alreadyWon=!!state._gameRewards[rewardKey];
@@ -2065,7 +2109,7 @@ function renderParentKid(kidId){
     const cs=getCS(kidId,ch.id);
     const cat=ch.category||'afterschool';
     const catIcon={'morning':'🌅','afterschool':'🏠','afterdinner':'🌙'}[cat]||'📋';
-    const checkedTime=cs.checkedAt?` <span style="font-size:.7rem;color:var(--muted)">(${cs.checkedAt.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})})</span>`:'';
+    const checkedTime=cs.checkedAt?` <span style="font-size:.7rem;color:var(--muted)">(${cs.checkedAt.toLocaleTimeString('en-US',{timeZone:TZ,hour:'2-digit',minute:'2-digit'})})</span>`:'';
     return`<div class="sign-row"><span>${cs.cancelled?'🚫':cs.signed?'✅':cs.checked?'⏳':'◻️'}</span>
       <span style="flex:1">${catIcon} ${ch.name}${checkedTime}</span>
       <div style="display:flex;gap:4px">
@@ -2086,7 +2130,9 @@ function renderParentKid(kidId){
       </div>
       <div style="font-family:'Fredoka One',cursive;font-size:1.8rem;color:${KC[i]}">${kid.points} ⭐</div></div>
     <div style="display:flex;gap:7px;margin-top:10px;flex-wrap:wrap">
-      ${!kid.loggedInAt?`<button class="btn btn-green btn-sm" onclick="loginKid(${kidId})">Log Home</button>`:`<span class="badge badge-signed">🏠 ${kid.homeTime?kid.homeTime.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'Home'}</span>`}
+      ${!kid.loggedInAt
+        ?`<button class="btn btn-green btn-sm" onclick="loginKid(${kidId})">🏠 Log Home</button>`
+        :`<span style="display:flex;align-items:center;gap:5px"><span class="badge badge-signed">🏠 ${kid.homeTime?kid.homeTime.toLocaleTimeString('en-US',{timeZone:TZ,hour:'2-digit',minute:'2-digit'}):'Home'}</span><button class="btn btn-outline btn-sm" onclick="logoutKid(${kidId})" title="Undo home check-in" style="padding:3px 8px;font-size:.75rem">↩️ Undo</button></span>`}
       <button class="btn btn-gold btn-sm" onclick="giveBonus(${kidId})">⭐ Bonus +1</button>
       <button class="btn btn-outline btn-sm" onclick="openAdjustPoints(${kidId})">✏️ Adjust Points</button>
       <button class="btn btn-outline btn-sm" onclick="openActivityLog(${kidId})" style="border-color:#7c3aed;color:#7c3aed">📋 Activity Log</button>
@@ -2103,7 +2149,7 @@ function renderRewards(isParent=false){
   const kidId=session.type==='kid'?session.id:null;
   const kid=kidId!==null?getKid(kidId):null;
   const pendingCount=(state.rewardRequests||[]).filter(r=>r.status==='pending').length;
-  const isSunday=new Date().getDay()===0;
+  const isSunday=njDateParts().weekday==='Sun';
   const cards=state.rewards.map(r=>{
     const editBtns=isParent?`<div style="display:flex;gap:5px;margin-bottom:7px"><button class="btn btn-outline btn-sm" onclick="editReward(${r.id})">✏️</button><button class="btn btn-red btn-sm" onclick="deleteReward(${r.id})">🗑️</button></div>`:'';
     if(isParent){
@@ -2185,7 +2231,7 @@ function confirmRewardRequest(){
   state.rewardRequests.push({
     id:`req_${Date.now()}`,kidId:kid.id,rewardId,status:'pending',
     redeemDay:_selectedRedeemDay||'Any',
-    time:new Date().toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
+    time:new Date().toLocaleString('en-US',{timeZone:TZ,month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
   });
   document.getElementById('rewardDayOverlay')?.remove();
   notify(`${kid.emoji} Reward requested for ${_selectedRedeemDay||'Any day'}! Waiting for parent 🙏`,'#7c3aed');
@@ -2226,7 +2272,7 @@ function approveRewardRequest(reqId){
   if(!kid||!reward)return;
   if(kid.points<reward.cost){notify(`${kid.name} doesn't have enough points!`,'#ef4444');req.status='denied';openRewardApprovals();return;}
   kid.points-=reward.cost;
-  kid.pointLog.unshift({amount:-reward.cost,reason:`🎁 Redeemed: ${reward.name}${req.redeemDay?` (${req.redeemDay})`:''}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+  kid.pointLog.unshift({amount:-reward.cost,reason:`🎁 Redeemed: ${reward.name}${req.redeemDay?` (${req.redeemDay})`:''}`,time:new Date().toLocaleTimeString('en-US',{timeZone:TZ,hour:'2-digit',minute:'2-digit'})});
   req.status='approved';confetti();
   notify(`🎉 Approved! ${kid.emoji} ${kid.name} redeemed "${reward.name}"!`,'#f59e0b');
   openRewardApprovals();renderTab(session.type,session.id);saveState();
@@ -3346,7 +3392,7 @@ function sendMessage(myKey){
     fromType:sender.type,
     to,
     text,
-    time:new Date().toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}),
+    time:new Date().toLocaleString('en-US',{timeZone:TZ,month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}),
     read:[String(myKey)]
   });
   // Keep max 200 messages
@@ -3434,7 +3480,7 @@ function postDayBoard(myKey){
     authorName:sender?.name||'Staff',
     authorEmoji:sender?.emoji||'📌',
     text,pinned,
-    time:new Date().toLocaleString([],{weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
+    time:new Date().toLocaleString('en-US',{timeZone:TZ,weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
   });
   if(state.dayBoard.length>50) state.dayBoard=state.dayBoard.slice(0,50);
   document.getElementById('dbText').value='';
@@ -3517,7 +3563,7 @@ function addNeedsItem(myKey){
     addedBy:sender?.name||'Someone',
     addedByEmoji:sender?.emoji||'👤',
     done:false,
-    time:new Date().toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
+    time:new Date().toLocaleString('en-US',{timeZone:TZ,month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
   });
   inp.value='';
   saveState();renderTab(session.type,session.id);notify('🛒 Added to Needs List!','#10b981');
@@ -3608,10 +3654,23 @@ function selectEmoji(e){
 function loginKid(id){
   const k=getKid(id);
   const now=new Date();
-  k.loggedInAt=now;k.homeTime=now;
-  logActivity(id,'🏠',`Checked in home — after-school timer started`);
+  k.loggedInAt=now;
+  k.homeTime=now;
+  logActivity(id,'🏠','Checked in home — after-school timer started');
+  saveState(); // save BEFORE render so state is definitely committed
   notify(`${k.emoji} ${k.name} is home! ⏱️ Timer started`,'#ff7a00');
-  renderTab(session.type,session.id);saveState();
+  renderTab(session.type,session.id);
+}
+function logoutKid(id){
+  // Parent: undo home check-in (e.g. kid tapped by mistake)
+  if(!confirm('Undo home check-in for '+getKid(id).name+'?'))return;
+  const k=getKid(id);
+  k.loggedInAt=null;
+  k.homeTime=null;
+  logActivity(id,'↩️','Home check-in removed by parent');
+  saveState();
+  renderTab(session.type,session.id);
+  notify('↩️ Home check-in removed','#6b7280');
 }
 function toggleChore(kidId,choreId){
   const cs=getCS(kidId,choreId);
@@ -3681,7 +3740,7 @@ function checkAllSigned(kidId){
 function addPoints(kidId,amount,reason){
   const k=getKid(kidId);
   k.points=Math.max(0,k.points+amount);
-  const t=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const t=new Date().toLocaleTimeString('en-US',{timeZone:TZ,hour:'2-digit',minute:'2-digit'});
   k.pointLog.unshift({amount,reason,time:t});
   if(amount>0){
     notify(`${k.emoji} ${k.name} +${amount} ⭐`,'#f59e0b');
@@ -3695,7 +3754,7 @@ function logActivity(kidId,icon,msg,extraData){
   if(!k.activityLog)k.activityLog=[];
   const now=new Date();
   k.activityLog.unshift({
-    time:now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}),
+    time:now.toLocaleTimeString('en-US',{timeZone:TZ,hour:'2-digit',minute:'2-digit',second:'2-digit'}),
     ts:now.toISOString(),
     icon,msg,...(extraData||{})
   });
@@ -3704,7 +3763,7 @@ function logActivity(kidId,icon,msg,extraData){
 
 // ─── TIME WINDOW HELPERS ─────────────────────────────────────
 // Returns current hour (0-23) in local time
-function nowHour(){return new Date().getHours();}
+function nowHour(){return njDateParts().hour;}
 // Returns {open:bool, reason:string}
 function choreWindowStatus(cat){
   const h=nowHour();
@@ -3770,7 +3829,7 @@ function checkCategoryBonus(kidId, cat){
 function redeemReward(kidId,rewardId){
   const k=getKid(kidId),r=state.rewards.find(x=>x.id===rewardId);if(!r)return;
   if(k.points<r.cost){notify(`❌ Need ${r.cost} pts`,'#ef4444');return;}
-  k.points-=r.cost;k.pointLog.unshift({amount:-r.cost,reason:`🎁 ${r.name}`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+  k.points-=r.cost;k.pointLog.unshift({amount:-r.cost,reason:`🎁 ${r.name}`,time:new Date().toLocaleTimeString('en-US',{timeZone:TZ,hour:'2-digit',minute:'2-digit'})});
   confetti();notify(`🎉 ${k.emoji} ${k.name} redeemed "${r.name}"!`,'#f59e0b');renderTab(session.type,session.id);
 }
 
@@ -4012,7 +4071,37 @@ function resetChore(kidId,choreId){
 }
 
 // ═══ DAILY HISTORY ═══
-function todayKey(){return new Date().toISOString().slice(0,10);}
+// ── Timezone: always NJ (America/New_York) ──
+const TZ = 'America/New_York';
+function njNow(){ return new Date(); } // wall-clock Date is always correct for arithmetic
+function njDateParts(){
+  // Returns {year,month,day,hour,minute,weekday} in NJ local time
+  const parts=new Intl.DateTimeFormat('en-US',{
+    timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit',
+    hour:'2-digit',minute:'2-digit',hour12:false,weekday:'short'
+  }).formatToParts(new Date());
+  const p={};
+  parts.forEach(x=>{ p[x.type]=x.value; });
+  return {
+    year:parseInt(p.year), month:parseInt(p.month), day:parseInt(p.day),
+    hour:parseInt(p.hour)%24, minute:parseInt(p.minute),
+    weekday:p.weekday // 'Sun','Mon' etc
+  };
+}
+function todayKey(){
+  const {year,month,day}=njDateParts();
+  return `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+}
+function njTimeStr(d){
+  // Format a Date as NJ local time string HH:MM am/pm
+  return (d||new Date()).toLocaleTimeString('en-US',{timeZone:TZ,hour:'2-digit',minute:'2-digit'});
+}
+function njDateTimeStr(d){
+  return (d||new Date()).toLocaleString('en-US',{timeZone:TZ,month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function njDateTimeLongStr(d){
+  return (d||new Date()).toLocaleString('en-US',{timeZone:TZ,weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+}
 function archiveToday(){
   const key=todayKey();
   if(!state.history)state.history={};
@@ -4158,7 +4247,7 @@ function buyRaffleTicket(kidId,cost){
   if(!kid||kid.points<cost){notify('Not enough ⭐!','#ef4444');return;}
   if(!state.raffle.active||state.raffle.drawn){notify('Raffle is not accepting tickets right now','#ef4444');return;}
   kid.points=Math.max(0,kid.points-cost);
-  kid.pointLog.unshift({amount:-cost,reason:`🎟️ Raffle ticket (${cost===3?'Golden':'Standard'})`,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+  kid.pointLog.unshift({amount:-cost,reason:`🎟️ Raffle ticket (${cost===3?'Golden':'Standard'})`,time:new Date().toLocaleTimeString('en-US',{timeZone:TZ,hour:'2-digit',minute:'2-digit'})});
   logActivity(kidId,'🎟️',`Bought ${cost===3?'Golden':'Standard'} raffle ticket — ${cost} ⭐`);
   if(!state.raffle.tickets) state.raffle.tickets=[];
   state.raffle.tickets.push({kidId,kidName:kid.name,kidEmoji:kid.emoji,cost,ts:new Date().toISOString()});
@@ -4652,8 +4741,8 @@ function hydrateState(saved){
   if(!saved.raffle.history) saved.raffle.history=[];
   if(saved.raffle.tickets) saved.raffle.tickets=Array.isArray(saved.raffle.tickets)?saved.raffle.tickets:Object.values(saved.raffle.tickets||{});
   // Prune old reward keys (keep only today's)
-  const _today=new Date().toISOString().slice(0,10);
-  Object.keys(saved._gameRewards).forEach(k=>{if(!k.endsWith(_today))delete saved._gameRewards[k];});
+  const _today=todayKey();
+  Object.keys(saved._gameRewards).forEach(k=>{if(!k.endsWith('_'+_today))delete saved._gameRewards[k];});
   if(!saved.needsList)       saved.needsList=[];
   if(!saved.gameWinScore)    saved.gameWinScore={pong:5,snake:10,breakout:0,space:0,dino:20,mathblast:10,memory:8,oddoneout:8,quiz:8};
   ['mathblast','memory','oddoneout','quiz'].forEach(id=>{if(saved.gameWinScore[id]===undefined)saved.gameWinScore[id]={mathblast:10,memory:8,oddoneout:8,quiz:8}[id];});
