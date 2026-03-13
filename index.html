@@ -2048,11 +2048,12 @@ function drawSpace(){
 // ─────────────────── DINO RUNNER ───────────────────
 function initDino(){
   const diff=getDiff('dino');
-  const speed=diff==='easy'?4:diff==='hard'?7:5.5;
+  const speed=diff==='easy'?3.5:diff==='hard'?6:4.5;       // medium starts slower
+  const spawnInterval=diff==='easy'?120:diff==='hard'?65:95; // medium more breathing room
   gameState.dino={
     dino:{x:60,y:0,vy:0,onGround:true,h:36,w:32},
     obstacles:[],score:0,WIN:state.gameWinScore?.dino??20,
-    speed,spawnTimer:0,spawnInterval:diff==='easy'?110:diff==='hard'?60:80,
+    speed,spawnTimer:0,spawnInterval,
     groundY:0,keys:{jump:false},touch:{jump:false},jumped:false,
   };
   gameState.dino.groundY=cH()-50;
@@ -2085,17 +2086,21 @@ function updateDino(){
       setScoreBar([{label:'Score',val:d.score,color:'#ff7a00'},{label:'Best',val:getBest('dino'),color:'#f59e0b'}]);
       // No per-obstacle points — reward only comes from onGameWin at win threshold
       if(d.score>=d.WIN&&!d._rewarded){onGameWin(d.score);}
-      // Every 5 obstacles: speed up with no cap, and tighten spawn interval
+      // Every 5 obstacles: gradually speed up — but cap so it stays beatable
       if(d.score>0&&d.score%5===0){
-        d.speed=+(d.speed+0.6).toFixed(2); // accelerate forever, no ceiling
-        d.spawnInterval=Math.max(25,d.spawnInterval-5); // gaps shrink but never below 25 frames
+        const diff=getDiff('dino');
+        const maxSpeed=diff==='easy'?5.5:diff==='hard'?10:7; // medium caps at 7
+        const minInterval=diff==='easy'?80:diff==='hard'?30:55; // medium never below 55 frames
+        d.speed=+Math.min(maxSpeed,d.speed+0.4).toFixed(2); // smaller steps too
+        d.spawnInterval=Math.max(minInterval,d.spawnInterval-4);
       }
     }return true;
   });
   // Collision
   const dx=d.dino.x,dy=d.dino.y,dw=d.dino.w,dh=d.dino.h;
   for(const o of d.obstacles){
-    if(dx+dw-6>o.x&&dx+6<o.x+o.w&&dy+dh-4>o.y&&dy+4<o.y+o.h){onGameEnd(d.score);return;}
+    const margin=getDiff('dino')==='hard'?4:getDiff('dino')==='easy'?10:7;
+    if(dx+dw-margin>o.x&&dx+margin<o.x+o.w&&dy+dh-margin>o.y&&dy+margin<o.y+o.h){onGameEnd(d.score);return;}
   }
   drawDino();
 }
