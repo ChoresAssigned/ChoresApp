@@ -413,7 +413,7 @@ select.diff-sel{background:var(--surface2);border:2px solid var(--border);border
     <div class="logo">⭐ Champions</div>
     <div class="user-pill"><span id="userEm">👤</span>&nbsp;<span id="userName">User</span></div>
     <div class="header-right">
-      <div id="fbStatusDot" title="Firebase: not connected" onclick="showFBSetup()" style="width:10px;height:10px;border-radius:50%;background:#ef4444;cursor:pointer;margin-top:2px;box-shadow:0 0 0 3px white,0 0 0 4px #ef4444;flex-shrink:0;align-self:center" title="Firebase status — tap to reconfigure"></div>
+      <div id="fbStatusDot" onclick="showFBSetup()" title="Firebase status" style="display:flex;align-items:center;gap:5px;cursor:pointer;background:var(--surface2);border-radius:99px;padding:3px 9px 3px 6px;border:2px solid var(--border);font-size:.72rem;font-weight:800;font-family:'Nunito',sans-serif;white-space:nowrap"><span id="fbDotCircle" style="width:8px;height:8px;border-radius:50%;background:#ef4444;flex-shrink:0;display:inline-block"></span><span id="fbDotLabel">Not connected</span></div>
       <button class="icon-btn" onclick="refreshApp()" title="Refresh">🔄</button>
       <button class="icon-btn" onclick="openSettings()" title="Settings">⚙️</button>
       <button class="icon-btn" onclick="goHome()" title="Log out">🚪</button>
@@ -4951,8 +4951,7 @@ async function startLiveSync(){
       }
     });
     fbConfigured=true;
-    const dot=document.getElementById('fbStatusDot');
-    if(dot){ dot.style.background='#10b981'; dot.style.boxShadow='0 0 0 3px white,0 0 0 4px #10b981'; dot.title='🔥 Firebase synced'; }
+    setDotState('ok');
     console.log('🔥 Firebase live sync active');
   }catch(e){
     console.warn('Live sync failed',e);
@@ -5004,17 +5003,20 @@ async function tryAutoConnect(){
 }
 
 function setDotState(s){
-  const dot = document.getElementById('fbStatusDot');
-  if(!dot) return;
+  const circle = document.getElementById('fbDotCircle');
+  const label  = document.getElementById('fbDotLabel');
+  if(!circle||!label) return;
   const states = {
-    connecting: { bg:'#f59e0b', shadow:'#f59e0b', title:'🔄 Connecting to Firebase...' },
-    ok:         { bg:'#10b981', shadow:'#10b981', title:'🔥 Firebase synced ✅' },
-    error:      { bg:'#ef4444', shadow:'#ef4444', title:'❌ Firebase offline — running locally' },
+    connecting: { bg:'#f59e0b', text:'Connecting...', title:'🔄 Connecting to Firebase...' },
+    ok:         { bg:'#10b981', text:'Connected',     title:'🔥 Firebase synced ✅' },
+    error:      { bg:'#ef4444', text:'Not connected', title:'❌ Firebase offline — running locally' },
   };
   const st = states[s] || states.error;
-  dot.style.background = st.bg;
-  dot.style.boxShadow  = `0 0 0 3px white, 0 0 0 4px ${st.shadow}`;
-  dot.title = st.title;
+  circle.style.background = st.bg;
+  label.textContent = st.text;
+  label.style.color = st.bg;
+  const dot = document.getElementById('fbStatusDot');
+  if(dot) dot.title = st.title;
 }
 
 // Save on app hide / periodic local backup
