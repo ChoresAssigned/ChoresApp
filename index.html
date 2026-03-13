@@ -289,6 +289,7 @@ select.diff-sel{background:var(--surface2);border:2px solid var(--border);border
   z-index:999;display:none;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.12);
   animation:slideup .3s ease}
 @keyframes slideup{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes spin{to{transform:rotate(360deg)}}
 /* ── In-app alert banner ── */
 #alertBanner{position:fixed;top:0;left:0;right:0;z-index:1100;display:none;flex-direction:column;gap:0}
 .alert-item{display:flex;align-items:center;gap:10px;padding:11px 16px;font-family:'Nunito',sans-serif;
@@ -413,6 +414,7 @@ select.diff-sel{background:var(--surface2);border:2px solid var(--border);border
     <div class="user-pill"><span id="userEm">👤</span>&nbsp;<span id="userName">User</span></div>
     <div class="header-right">
       <div id="fbStatusDot" title="Firebase: not connected" onclick="showFBSetup()" style="width:10px;height:10px;border-radius:50%;background:#ef4444;cursor:pointer;margin-top:2px;box-shadow:0 0 0 3px white,0 0 0 4px #ef4444;flex-shrink:0;align-self:center" title="Firebase status — tap to reconfigure"></div>
+      <button class="icon-btn" onclick="refreshApp()" title="Refresh">🔄</button>
       <button class="icon-btn" onclick="openSettings()" title="Settings">⚙️</button>
       <button class="icon-btn" onclick="goHome()" title="Log out">🚪</button>
     </div>
@@ -878,6 +880,18 @@ function goHome(){
   session={type:null,id:null};
   clearAlerts();pinBuf='';
   showScreen('homeScreen');
+}
+function refreshApp(){
+  const btn=event?.target;
+  if(btn){btn.style.animation='spin .6s linear';setTimeout(()=>btn.style.animation='',700);}
+  notify('🔄 Refreshing...','#0ea5e9');
+  if(db) startLiveSync();
+  setTimeout(()=>{
+    checkMissedReset();
+    if(session.type) renderTab(session.type,session.id);
+    renderHome();
+    notify('✅ Up to date!','#10b981');
+  }, 800);
 }
 
 // ═══ HOME ═══
