@@ -289,6 +289,14 @@ select.diff-sel{background:var(--surface2);border:2px solid var(--border);border
   z-index:999;display:none;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.12);
   animation:slideup .3s ease}
 @keyframes slideup{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+/* ── In-app alert banner ── */
+#alertBanner{position:fixed;top:0;left:0;right:0;z-index:1100;display:none;flex-direction:column;gap:0}
+.alert-item{display:flex;align-items:center;gap:10px;padding:11px 16px;font-family:'Nunito',sans-serif;
+  font-weight:800;font-size:.88rem;color:white;animation:slidedown .3s ease;border-bottom:1px solid rgba(255,255,255,.15)}
+@keyframes slidedown{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}
+.alert-item .alert-msg{flex:1;line-height:1.3}
+.alert-item .alert-close{background:rgba(255,255,255,.25);border:none;border-radius:50%;width:22px;height:22px;
+  color:white;font-size:.8rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:900}
 .confetti-wrap{position:fixed;inset:0;pointer-events:none;z-index:998;overflow:hidden;display:none}
 .confetti-piece{position:absolute;animation:cffall linear forwards}
 @keyframes cffall{0%{transform:translateY(-20px) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}
@@ -421,6 +429,7 @@ select.diff-sel{background:var(--surface2);border:2px solid var(--border);border
 </div><!-- #app -->
 
 <div id="notif"></div>
+<div id="alertBanner"></div>
 <div class="confetti-wrap" id="confettiWrap"></div>
 
 <!-- REWARD MODAL -->
@@ -735,6 +744,107 @@ function tick(){
 setInterval(tick,1000);tick();
 
 // ═══ NOTIFY ═══
+
+// ═══════════════════════════════════════════════════════
+// IN-APP ALERT NOTIFICATION SYSTEM
+// ═══════════════════════════════════════════════════════
+const _shownAlerts = new Set(); // dedup within session
+
+function showAlert(id, msg, color='#ff7a00', icon='🔔'){
+  // Dedup — don't show same alert twice in a session
+  if(_shownAlerts.has(id)) return;
+  _shownAlerts.add(id);
+
+  const banner = document.getElementById('alertBanner');
+  if(!banner) return;
+
+  const item = document.createElement('div');
+  item.className = 'alert-item';
+  item.style.background = color;
+  item.dataset.alertId = id;
+  item.innerHTML = `<span style="font-size:1.2rem">${icon}</span>
+    <div class="alert-msg">${msg}</div>
+    <button class="alert-close" onclick="dismissAlert('${id}')">✕</button>`;
+  banner.appendChild(item);
+  banner.style.display = 'flex';
+}
+
+function dismissAlert(id){
+  const banner = document.getElementById('alertBanner');
+  if(!banner) return;
+  const item = banner.querySelector(`[data-alert-id="${id}"]`);
+  if(item) item.remove();
+  if(!banner.children.length) banner.style.display = 'none';
+}
+
+function clearAlerts(){
+  const banner = document.getElementById('alertBanner');
+  if(banner){ banner.innerHTML=''; banner.style.display='none'; }
+  _shownAlerts.clear();
+}
+
+// Called when a kid checks a chore — notifies parent/supervisor if they're logged in
+function alertChoreChecked(kidId, choreName){
+  if(!session.type) return;
+  if(session.type !== 'parent' && session.type !== 'supervisor') return;
+  const kid = getKid(kidId);
+  if(!kid) return;
+  const alertId = `chore_checked_${kidId}_${choreName}_${Date.now()}`;
+  showAlert(alertId,
+    `${kid.emoji} <strong>${kid.name}</strong> checked off <strong>${choreName}</strong> — ready to sign!`,
+    '#0ea5e9', '☑️'
+  );
+}
+
+// Called when a kid taps I'm Home — notifies parent/supervisor
+function alertKidHome(kidId){
+  if(!session.type) return;
+  if(session.type !== 'parent' && session.type !== 'supervisor') return;
+  const kid = getKid(kidId);
+  if(!kid) return;
+  const alertId = `kid_home_${kidId}_${todayKey()}`;
+  showAlert(alertId,
+    `${kid.emoji} <strong>${kid.name}</strong> just got home! After-school timer started.`,
+    '#10b981', '🏠'
+  );
+}
+
+// Called on 60s heartbeat — reminds kids if no after-school chores started by 5pm
+function checkKidReminders(){
+  if(!session.type || session.type !== 'kid') return;
+  const {hour} = njDateParts();
+  if(hour < 17) return; // only remind after 5pm
+
+  const kidId = session.id;
+  const kid = getKid(kidId);
+  if(!kid) return;
+
+  // Check if they have any after-school chores
+  const asChores = kidChores(kidId).filter(c=>(c.category||'afterschool')==='afterschool');
+  if(!asChores.length) return;
+
+  // Check if any have been checked
+  const anyChecked = asChores.some(c => getCS(kidId, c.id).checked || getCS(kidId, c.id).signed);
+  if(anyChecked) return;
+
+  // Not checked in yet?
+  if(!kid.loggedInAt){
+    const alertId = `no_checkin_${kidId}_${todayKey()}`;
+    showAlert(alertId,
+      `Hey ${kid.emoji} <strong>${kid.name}</strong>! It's after 5pm — don't forget to tap <strong>I'm Home</strong> and start your chores! 🏠`,
+      '#ef4444', '⏰'
+    );
+  } else {
+    const alertId = `no_chores_${kidId}_${todayKey()}`;
+    showAlert(alertId,
+      `Hey ${kid.emoji} <strong>${kid.name}</strong>! You haven't started your after-school chores yet — get going! 💪`,
+      '#f59e0b', '⏰'
+    );
+  }
+}
+
+// Clear alerts when user logs out (go home)
+
 let ntTimer;
 function notify(msg,color='#10b981'){
   const n=document.getElementById('notif');
@@ -765,7 +875,8 @@ function showScreen(id){
 }
 function goHome(){
   stopCurrentGame();
-  session={type:null,id:null};pinBuf='';
+  session={type:null,id:null};
+  clearAlerts();pinBuf='';
   showScreen('homeScreen');
 }
 
@@ -3682,8 +3793,9 @@ function loginKid(id){
   k.loggedInAt=now;
   k.homeTime=now;
   logActivity(id,'🏠','Checked in home — after-school timer started');
-  saveState(); // save BEFORE render so state is definitely committed
+  saveState();
   notify(`${k.emoji} ${k.name} is home! ⏱️ Timer started`,'#ff7a00');
+  alertKidHome(id);
   renderTab(session.type,session.id);
 }
 function logoutKid(id){
@@ -3721,6 +3833,7 @@ function toggleChore(kidId,choreId){
     }
     setCS(kidId,choreId,{checked:true,checkedAt:now});
     logActivity(kidId,'☑️',`Checked: ${chore.name}`);
+    alertChoreChecked(kidId, chore.name);
   } else {
     setCS(kidId,choreId,{checked:false,checkedAt:null});
     logActivity(kidId,'↩️',`Unchecked: ${chore.name}`);
@@ -4981,6 +5094,7 @@ scheduleMidnightReset();
 setInterval(()=>{
   if(session.type) renderTab(session.type, session.id);
   checkMissedReset();
+  checkKidReminders();
 }, 60000);
 
 // Register Service Worker
